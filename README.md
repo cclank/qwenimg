@@ -16,14 +16,57 @@ QwenImg 是一个轻量级（<500 行代码）的 Python 包，让你能够用�
 
 ## 📦 安装
 
+### 环境要求
+
+- Python 3.8 或更高版本
+- pip（Python 包管理器）
+
+### 完整安装步骤
+
+**1. 克隆或下载项目**
+
+```bash
+git clone <repository-url>
+cd qwenimg
+```
+
+**2. 创建虚拟环境（推荐）**
+
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境
+# Linux/macOS:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+```
+
+**3. 安装依赖**
+
+方式一：安装为可编辑包（推荐开发使用）
+
 ```bash
 pip install -e .
 ```
 
-或直接安装依赖：
+方式二：仅安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+方式三：手动安装
 
 ```bash
 pip install dashscope pillow requests python-dotenv
+```
+
+**4. 验证安装**
+
+```bash
+python -c "from qwenimg import QwenImg; print('QwenImg installed successfully!')"
 ```
 
 ## 🔑 API Key 配置
@@ -211,6 +254,8 @@ client = QwenImg(region="singapore")
 
 项目包含丰富的示例代码，位于 `examples/` 目录：
 
+### Python 脚本
+
 - `text_to_image_basic.py` - 基础文生图（3 行代码）
 - `text_to_image_advanced.py` - 高级文生图用法
 - `image_to_video.py` - 图生视频
@@ -218,12 +263,23 @@ client = QwenImg(region="singapore")
 - `workflow.py` - 完整工作流示例
 - `list_models.py` - 查看所有支持的模型
 
-运行示例：
+### Jupyter Notebook
+
+- `complete_tutorial.ipynb` - **完整教程 Notebook**，覆盖所有使用场景，适合交互式学习和调试
+
+运行 Python 示例：
 
 ```bash
 cd examples
 python text_to_image_basic.py
 python workflow.py
+```
+
+运行 Jupyter Notebook：
+
+```bash
+cd examples
+jupyter notebook complete_tutorial.ipynb
 ```
 
 ## 🎨 API 参考
