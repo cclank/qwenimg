@@ -12,12 +12,12 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 setup(
     name="qwenimg",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="岚叔",
+    author_email="",
     description="Simple and elegant Python client for Alibaba Cloud Qwen Image and Video Generation",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/qwenimg",
+    url="https://github.com/cclank/qwenimg",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -50,8 +50,8 @@ setup(
     },
     keywords="qwen alibaba aliyun image video generation ai ml dashscope",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/qwenimg/issues",
-        "Source": "https://github.com/yourusername/qwenimg",
-        "Documentation": "https://github.com/yourusername/qwenimg#readme",
+        "Bug Reports": "https://github.com/cclank/qwenimg/issues",
+        "Source": "https://github.com/cclank/qwenimg",
+        "Documentation": "https://github.com/cclank/qwenimg#readme",
     },
 )

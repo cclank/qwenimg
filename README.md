@@ -2,7 +2,7 @@
 
 **简洁优雅的阿里云百炼 Qwen 图片和视频生成 Python 客户端**
 
-QwenImg 是一个轻量级（<500 行代码）的 Python 包，让你能够用最简单的方式调用阿里云百炼的通义万相图片和视频生成 API。参考了 [gemimg](https://github.com/minimaxir/gemimg) 的设计理念，专注于提供极简的 API 和最佳的开发体验。
+QwenImg 是一个轻量级（<500 行代码）的 Python 包，让你能够用最简单的方式调用阿里云百炼的通义万相图片和视频生成 API，专注于提供极简的 API 和最佳的开发体验。
 
 ## ✨ 特性
 
@@ -250,11 +250,41 @@ client = QwenImg(region="singapore")
 
 **注意：** 不同地域需要使用对应地域的 API Key。
 
-## 📚 示例代码
+## 📚 使用方式
 
-项目包含丰富的示例代码，位于 `examples/` 目录：
+### 🌐 Web 界面（推荐）
 
-### Python 脚本
+提供了基于 Streamlit 的可视化 Web 界面，无需编写代码即可使用所有功能：
+
+```bash
+# 安装 Streamlit
+pip install streamlit
+
+# 运行 Web 界面
+streamlit run app.py
+```
+
+**Web 界面功能：**
+- ✅ 文生图 - 支持所有参数配置
+- ✅ 图生视频 - 拖拽上传图片
+- ✅ 文生视频 - 实时预览
+- ✅ 图片下载 - 一键下载生成的图片
+- ✅ 视频预览 - 在线播放生成的视频
+
+### 📓 Jupyter Notebook
+
+适合交互式学习和调试的完整教程：
+
+```bash
+cd examples
+jupyter notebook complete_tutorial.ipynb
+```
+
+- `complete_tutorial.ipynb` - 覆盖所有使用场景，包含 10 个章节，40+ 代码示例
+
+### 🐍 Python 脚本
+
+位于 `examples/` 目录的示例脚本：
 
 - `text_to_image_basic.py` - 基础文生图（3 行代码）
 - `text_to_image_advanced.py` - 高级文生图用法
@@ -263,23 +293,12 @@ client = QwenImg(region="singapore")
 - `workflow.py` - 完整工作流示例
 - `list_models.py` - 查看所有支持的模型
 
-### Jupyter Notebook
-
-- `complete_tutorial.ipynb` - **完整教程 Notebook**，覆盖所有使用场景，适合交互式学习和调试
-
-运行 Python 示例：
+运行示例：
 
 ```bash
 cd examples
 python text_to_image_basic.py
 python workflow.py
-```
-
-运行 Jupyter Notebook：
-
-```bash
-cd examples
-jupyter notebook complete_tutorial.ipynb
 ```
 
 ## 🎨 API 参考
@@ -363,7 +382,7 @@ jupyter notebook complete_tutorial.ipynb
 
 ## 💡 设计理念
 
-QwenImg 的设计参考了 [gemimg](https://github.com/minimaxir/gemimg) 项目，遵循以下原则：
+QwenImg 遵循以下设计原则：
 
 1. **极简 API** - 3 行代码就能完成任务
 2. **智能默认** - 自动处理常见需求（保存、格式转换等）
