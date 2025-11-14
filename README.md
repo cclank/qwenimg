@@ -95,7 +95,26 @@ client = QwenImg(api_key="sk-xxx")
 
 ## 🚀 快速开始
 
-### 文生图 (Text-to-Image)
+### 🌐 方式一：Web 界面（推荐，零代码）
+
+最简单的使用方式，无需编写任何代码！
+
+```bash
+# Linux/macOS
+./run_web_ui.sh
+
+# Windows
+run_web_ui.bat
+
+# 或者手动启动
+streamlit run app.py
+```
+
+然后访问 `http://localhost:8501`，在浏览器中使用所有功能！
+
+### 🐍 方式二：Python 代码
+
+#### 文生图 (Text-to-Image)
 
 **最简单的用法 - 仅需 3 行代码：**
 
@@ -128,7 +147,7 @@ for i, img in enumerate(images, 1):
     print(f"Image {i}: {img.size}")
 ```
 
-### 图生视频 (Image-to-Video)
+#### 图生视频 (Image-to-Video)
 
 ```python
 # 从图片生成视频
@@ -173,7 +192,7 @@ video_url = client.image_to_video(
 )
 ```
 
-### 文生视频 (Text-to-Video)
+#### 文生视频 (Text-to-Video)
 
 ```python
 # 直接从文字生成视频
@@ -186,7 +205,7 @@ video_url = client.text_to_video(
 print(f"视频生成成功: {video_url}")
 ```
 
-### 完整工作流：文生图 -> 图生视频
+#### 完整工作流：文生图 -> 图生视频
 
 ```python
 from qwenimg import QwenImg
