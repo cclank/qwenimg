@@ -1,6 +1,14 @@
+#!/usr/bin/env python3
 """FastAPI 启动脚本"""
-import uvicorn
+import sys
 import os
+
+# 打印 Python 信息用于调试
+print(f"🐍 Python 可执行文件: {sys.executable}")
+print(f"🐍 Python 版本: {sys.version}")
+print(f"📂 Python 路径: {sys.path[:3]}")
+
+import uvicorn
 from dotenv import load_dotenv
 
 # 加载环境变量 - 运行时环境变量优先于.env文件

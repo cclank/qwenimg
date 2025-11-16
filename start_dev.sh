@@ -55,6 +55,10 @@ elif [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
 
+# 显示将要使用的 Python
+PYTHON_CMD=$(which python3)
+echo "🐍 使用 Python: $PYTHON_CMD"
+
 # 创建日志目录
 mkdir -p logs
 
@@ -62,7 +66,7 @@ mkdir -p logs
 echo ""
 echo "🚀 启动后端服务..."
 cd backend
-python3 run.py > ../logs/backend.log 2>&1 &
+$PYTHON_CMD run.py > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
 
