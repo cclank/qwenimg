@@ -14,6 +14,13 @@ if ! command -v streamlit &> /dev/null; then
     echo ""
 fi
 
+# 检查是否安装了 filelock
+if ! python -c "import filelock" &> /dev/null; then
+    echo "❌ 未检测到 filelock，正在安装..."
+    pip install filelock
+    echo ""
+fi
+
 # 检查 API Key
 if [ -z "$DASHSCOPE_API_KEY" ]; then
     echo "⚠️  提示：未检测到环境变量 DASHSCOPE_API_KEY"
