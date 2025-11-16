@@ -184,28 +184,61 @@ def apply_custom_styles():
             font-weight: 500;
         }
 
+        /* 禁用tab切换时的渐变动画 */
+        .stTabs [data-baseweb="tab-panel"] {
+            animation: none !important;
+            transition: none !important;
+        }
+
+        /* 禁用所有过渡和动画效果 */
+        .main .block-container {
+            transition: none !important;
+        }
+
         /* 侧边栏样式 */
         [data-testid="stSidebar"] {
             background-color: #ffffff;
         }
 
-        /* 移除默认padding */
+        /* 移除默认padding，使页面更紧凑 */
         .block-container {
-            padding-top: 2rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1rem;
         }
 
-        /* 图片容器 */
+        /* 减少标题间距 */
+        h3 {
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* 图片容器 - 限制最大尺寸 */
         .image-container {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
         }
 
-        /* 视频容器 */
+        /* 视频容器 - 限制最大尺寸 */
         .video-container {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* 限制图片和视频的最大宽度 */
+        .stImage, .stVideo {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* 减少组件间距 */
+        .element-container {
+            margin-bottom: 0.5rem;
         }
 
         /* 分隔线 */
@@ -465,8 +498,7 @@ tab1, tab2, tab3 = st.tabs(["📝 文生图", "🎬 图生视频", "🎥 文生�
 
 with tab1:
     st.markdown("### 文字生成图片")
-    st.markdown("使用文字描述生成高质量图片")
-    st.markdown("")
+    st.caption("使用文字描述生成高质量图片")
 
     # 输入区域
     with st.container():
@@ -540,8 +572,6 @@ with tab1:
                 key="watermark_t2i"
             )
 
-    st.markdown("")
-
     # 操作按钮
     col1, col2, col3 = st.columns([3, 1, 1])
 
@@ -606,25 +636,29 @@ with tab1:
         images = st.session_state.t2i_results['images']
 
         if len(images) == 1:
-            st.image(images[0], use_container_width=True)
-            buf = BytesIO()
-            images[0].save(buf, format="PNG")
-            st.download_button(
-                "📥 下载图片",
-                data=buf.getvalue(),
-                file_name=f"qwenimg_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                mime="image/png",
-                use_container_width=True
-            )
+            # 单张图片 - 居中显示，限制宽度
+            col1, col2, col3 = st.columns([1, 3, 1])
+            with col2:
+                st.image(images[0], width=600)
+                buf = BytesIO()
+                images[0].save(buf, format="PNG")
+                st.download_button(
+                    "📥 下载图片",
+                    data=buf.getvalue(),
+                    file_name=f"qwenimg_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                    mime="image/png",
+                    use_container_width=True
+                )
         else:
+            # 多张图片 - 网格显示
             cols = st.columns(2)
             for i, img in enumerate(images):
                 with cols[i % 2]:
-                    st.image(img, use_container_width=True)
+                    st.image(img, width=400)
                     buf = BytesIO()
                     img.save(buf, format="PNG")
                     st.download_button(
-                        f"📥 下载图片 {i+1}",
+                        f"📥 下载 {i+1}",
                         data=buf.getvalue(),
                         file_name=f"qwenimg_{i+1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                         mime="image/png",
@@ -636,8 +670,7 @@ with tab1:
 
 with tab2:
     st.markdown("### 图片生成视频")
-    st.markdown("上传图片，生成动态视频")
-    st.markdown("")
+    st.caption("上传图片，生成动态视频")
 
     # 图片上传
     uploaded_file = st.file_uploader(
@@ -651,9 +684,10 @@ with tab2:
         st.session_state.uploaded_image = uploaded_file
 
     if st.session_state.uploaded_image:
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            st.image(st.session_state.uploaded_image, caption="预览", use_container_width=True)
+        # 预览图片 - 限制尺寸
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(st.session_state.uploaded_image, caption="预览", width=400)
 
     # 提示词
     prompt_i2v = st.text_area(
@@ -712,8 +746,6 @@ with tab2:
             value=st.session_state.watermark_i2v,
             key="watermark_i2v"
         )
-
-    st.markdown("")
 
     # 操作按钮
     col1, col2, col3 = st.columns([3, 1, 1])
@@ -779,16 +811,19 @@ with tab2:
         st.markdown("### 🎬 生成结果")
 
         video_url = st.session_state.i2v_result['url']
-        st.video(video_url)
-        st.markdown(f"**视频链接**: [{video_url}]({video_url})")
-        st.info("💡 点击链接在新标签页打开，右键可保存视频")
+
+        # 视频居中显示，限制宽度
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col2:
+            st.video(video_url)
+            st.markdown(f"**视频链接**: [{video_url}]({video_url})")
+            st.info("💡 点击链接在新标签页打开，右键可保存视频")
 
 # ==================== Tab 3: 文生视频 ====================
 
 with tab3:
     st.markdown("### 文字生成视频")
-    st.markdown("使用文字描述生成动态视频")
-    st.markdown("")
+    st.caption("使用文字描述生成动态视频")
 
     # 提示词
     prompt_t2v = st.text_area(
@@ -848,8 +883,6 @@ with tab3:
             key="watermark_t2v"
         )
 
-    st.markdown("")
-
     # 操作按钮
     col1, col2, col3 = st.columns([3, 1, 1])
 
@@ -907,9 +940,13 @@ with tab3:
         st.markdown("### 🎥 生成结果")
 
         video_url = st.session_state.t2v_result['url']
-        st.video(video_url)
-        st.markdown(f"**视频链接**: [{video_url}]({video_url})")
-        st.info("💡 点击链接在新标签页打开，右键可保存视频")
+
+        # 视频居中显示，限制宽度
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col2:
+            st.video(video_url)
+            st.markdown(f"**视频链接**: [{video_url}]({video_url})")
+            st.info("💡 点击链接在新标签页打开，右键可保存视频")
 
 # ==================== 页脚 ====================
 
