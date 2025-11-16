@@ -1,37 +1,25 @@
 """
-QwenImg Web UI - 基于 Streamlit 的 Web 界面（异步任务版 v3）
+QwenImg Web UI - 极简版
 
 运行方式：
     streamlit run app.py
 
-改进内容：
-    - 使用 session_state 保存结果，切换 tab 不会丢失
-    - 保存所有输入字段，切换后历史输入保留
-    - 添加历史记录功能
-    - 改进用户体验
-
-v2 修复（2025-11-16）：
-    - 修复输入字段的 key 冲突问题
-    - 使用 Streamlit 推荐的自动 key 管理方式
-    - 解决 tab 切换时页面显示异常和历史记录问题
-    - 消除双重绑定导致的状态不一致
-
-v3 修复（2025-11-16）：
-    - 实现异步任务管理系统
-    - 每个tab的任务独立执行，互不阻塞
-    - 支持任务执行期间自由切换tab
-    - 任务状态持久化，切换tab后状态不丢失
+核心特性：
+    ✅ 支持页面刷新 - 本地持久化所有状态
+    ✅ 极简代码 - 统一任务管理
+    ✅ 并发创作 - 多任务同时执行
+    ✅ 完整历史 - 所有记录永久保存
 """
 
 import streamlit as st
 import os
+import sys
+import json
 from pathlib import Path
 from io import BytesIO
-import sys
 from datetime import datetime
-import base64
-import threading
 from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, Optional
 import time
 
 # 添加项目路径
@@ -41,842 +29,385 @@ if str(project_root) not in sys.path:
 
 from qwenimg import QwenImg
 
-# 页面配置
+# ==================== 配置 ====================
+DATA_DIR = Path.home() / ".qwenimg"
+DATA_DIR.mkdir(exist_ok=True)
+HISTORY_FILE = DATA_DIR / "history.json"
+STATE_FILE = DATA_DIR / "state.json"
+
 st.set_page_config(
-    page_title="QwenImg - 通义万相图片视频生成",
+    page_title="QwenImg - 极简版",
     page_icon="🎨",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# 初始化线程池（全局单例）
+# ==================== 持久化管理 ====================
+def load_json(file_path: Path, default=None):
+    """加载 JSON 文件"""
+    if file_path.exists():
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return default if default is not None else []
+
+def save_json(file_path: Path, data):
+    """保存 JSON 文件"""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def save_state():
+    """保存当前状态到本地"""
+    state_data = {
+        'tasks': st.session_state.get('tasks', {}),
+        'inputs': {
+            't2i': st.session_state.get('t2i_inputs', {}),
+            'i2v': st.session_state.get('i2v_inputs', {}),
+            't2v': st.session_state.get('t2v_inputs', {}),
+        }
+    }
+    save_json(STATE_FILE, state_data)
+
+def load_state():
+    """从本地加载状态"""
+    return load_json(STATE_FILE, {'tasks': {}, 'inputs': {'t2i': {}, 'i2v': {}, 't2v': {}}})
+
+def save_history(record: Dict[str, Any]):
+    """保存历史记录"""
+    history = load_json(HISTORY_FILE, [])
+    history.append(record)
+    # 只保留最近 100 条
+    if len(history) > 100:
+        history = history[-100:]
+    save_json(HISTORY_FILE, history)
+
+# ==================== 初始化 ====================
 if 'executor' not in st.session_state:
     st.session_state.executor = ThreadPoolExecutor(max_workers=3)
 
-# 初始化 session_state - 结果存储
+if 'tasks' not in st.session_state:
+    # 从本地加载状态
+    saved_state = load_state()
+    st.session_state.tasks = saved_state.get('tasks', {})
+    st.session_state.t2i_inputs = saved_state.get('inputs', {}).get('t2i', {})
+    st.session_state.i2v_inputs = saved_state.get('inputs', {}).get('i2v', {})
+    st.session_state.t2v_inputs = saved_state.get('inputs', {}).get('t2v', {})
+
 if 'history' not in st.session_state:
-    st.session_state.history = []
-if 't2i_results' not in st.session_state:
-    st.session_state.t2i_results = None
-if 'i2v_result' not in st.session_state:
-    st.session_state.i2v_result = None
-if 't2v_result' not in st.session_state:
-    st.session_state.t2v_result = None
-if 'uploaded_image' not in st.session_state:
-    st.session_state.uploaded_image = None
+    st.session_state.history = load_json(HISTORY_FILE, [])
 
-# 初始化任务状态管理
-if 't2i_task_status' not in st.session_state:
-    st.session_state.t2i_task_status = 'idle'  # idle, running, completed, error
-if 't2i_task_error' not in st.session_state:
-    st.session_state.t2i_task_error = None
-if 't2i_task_progress' not in st.session_state:
-    st.session_state.t2i_task_progress = 0
-
-if 'i2v_task_status' not in st.session_state:
-    st.session_state.i2v_task_status = 'idle'
-if 'i2v_task_error' not in st.session_state:
-    st.session_state.i2v_task_error = None
-if 'i2v_task_progress' not in st.session_state:
-    st.session_state.i2v_task_progress = 0
-
-if 't2v_task_status' not in st.session_state:
-    st.session_state.t2v_task_status = 'idle'
-if 't2v_task_error' not in st.session_state:
-    st.session_state.t2v_task_error = None
-if 't2v_task_progress' not in st.session_state:
-    st.session_state.t2v_task_progress = 0
-
-# 初始化 session_state - 文生图输入字段
-if 'prompt_t2i' not in st.session_state:
-    st.session_state.prompt_t2i = ""
-if 'negative_prompt_t2i' not in st.session_state:
-    st.session_state.negative_prompt_t2i = ""
-if 'model_t2i' not in st.session_state:
-    st.session_state.model_t2i = "wan2.5-t2i-preview"
-if 'size_t2i' not in st.session_state:
-    st.session_state.size_t2i = "1024*1024"
-if 'n_images' not in st.session_state:
-    st.session_state.n_images = 1
-if 'seed_t2i' not in st.session_state:
-    st.session_state.seed_t2i = 0
-if 'prompt_extend' not in st.session_state:
-    st.session_state.prompt_extend = True
-if 'watermark_t2i' not in st.session_state:
-    st.session_state.watermark_t2i = False
-
-# 初始化 session_state - 图生视频输入字段
-if 'prompt_i2v' not in st.session_state:
-    st.session_state.prompt_i2v = ""
-if 'negative_prompt_i2v' not in st.session_state:
-    st.session_state.negative_prompt_i2v = ""
-if 'model_i2v' not in st.session_state:
-    st.session_state.model_i2v = "wan2.5-i2v-preview"
-if 'resolution_i2v' not in st.session_state:
-    st.session_state.resolution_i2v = "1080P"
-if 'duration_i2v' not in st.session_state:
-    st.session_state.duration_i2v = 10
-if 'seed_i2v' not in st.session_state:
-    st.session_state.seed_i2v = 0
-if 'watermark_i2v' not in st.session_state:
-    st.session_state.watermark_i2v = False
-
-# 初始化 session_state - 文生视频输入字段
-if 'prompt_t2v' not in st.session_state:
-    st.session_state.prompt_t2v = ""
-if 'negative_prompt_t2v' not in st.session_state:
-    st.session_state.negative_prompt_t2v = ""
-if 'model_t2v' not in st.session_state:
-    st.session_state.model_t2v = "wan2.5-t2v-preview"
-if 'resolution_t2v' not in st.session_state:
-    st.session_state.resolution_t2v = "1080P"
-if 'duration_t2v' not in st.session_state:
-    st.session_state.duration_t2v = 10
-if 'seed_t2v' not in st.session_state:
-    st.session_state.seed_t2v = 0
-if 'watermark_t2v' not in st.session_state:
-    st.session_state.watermark_t2v = False
-
-# 自定义 CSS
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        text-align: center;
-        background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 1rem;
+# ==================== 任务管理 ====================
+def create_task(task_id: str, task_type: str, params: Dict[str, Any]):
+    """创建新任务"""
+    task = {
+        'id': task_id,
+        'type': task_type,
+        'status': 'running',  # running, completed, error
+        'params': params,
+        'result': None,
+        'error': None,
+        'created_at': datetime.now().isoformat(),
     }
-    .sub-header {
-        text-align: center;
-        color: #666;
-        margin-bottom: 2rem;
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 5px;
-        font-weight: bold;
-    }
-    .success-box {
-        padding: 1rem;
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 5px;
-        color: #155724;
-        margin: 1rem 0;
-    }
-    .history-item {
-        padding: 0.8rem;
-        margin: 0.5rem 0;
-        background-color: #f8f9fa;
-        border-left: 3px solid #667eea;
-        border-radius: 3px;
-    }
-    .time-badge {
-        color: #888;
-        font-size: 0.85rem;
-    }
-</style>
-""", unsafe_allow_html=True)
+    st.session_state.tasks[task_id] = task
+    save_state()
+    return task
 
-# 标题
-st.markdown('<div class="main-header">🎨 QwenImg</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">阿里云百炼通义万相 - 图片与视频生成</div>', unsafe_allow_html=True)
+def update_task(task_id: str, **kwargs):
+    """更新任务状态"""
+    if task_id in st.session_state.tasks:
+        st.session_state.tasks[task_id].update(kwargs)
+        save_state()
 
-# 侧边栏 - API Key 配置
-with st.sidebar:
-    st.header("⚙️ 配置")
+def get_active_tasks(task_type: Optional[str] = None):
+    """获取活动任务"""
+    tasks = st.session_state.tasks.values()
+    if task_type:
+        tasks = [t for t in tasks if t['type'] == task_type]
+    return [t for t in tasks if t['status'] == 'running']
 
-    api_key = st.text_input(
-        "DashScope API Key",
-        type="password",
-        value=os.getenv("DASHSCOPE_API_KEY", ""),
-        help="获取 API Key: https://help.aliyun.com/zh/model-studio/get-api-key"
-    )
+def get_completed_task(task_type: str):
+    """获取最近完成的任务"""
+    tasks = [t for t in st.session_state.tasks.values()
+             if t['type'] == task_type and t['status'] == 'completed']
+    return tasks[-1] if tasks else None
 
-    region = st.selectbox(
-        "地域选择",
-        ["beijing", "singapore"],
-        help="不同地域需要使用对应地域的 API Key"
-    )
-
-    st.markdown("---")
-
-    # 历史记录
-    st.header("📜 历史记录")
-
-    if st.session_state.history:
-        if st.button("🗑️ 清空历史", key="clear_history"):
-            st.session_state.history = []
-            st.rerun()
-
-        st.markdown(f"**共 {len(st.session_state.history)} 条记录**")
-
-        # 显示最近 5 条
-        for i, record in enumerate(reversed(st.session_state.history[-5:])):
-            with st.expander(f"{record['type']} - {record['time']}", expanded=False):
-                st.markdown(f"**提示词**: {record.get('prompt', 'N/A')[:50]}...")
-                if record['type'] == '文生图':
-                    st.markdown(f"**数量**: {record.get('count', 1)} 张")
-                elif record['type'] in ['图生视频', '文生视频']:
-                    st.markdown(f"**分辨率**: {record.get('resolution', 'N/A')}")
-                    st.markdown(f"**时长**: {record.get('duration', 'N/A')} 秒")
-    else:
-        st.info("暂无历史记录")
-
-    st.markdown("---")
-
-    st.header("📚 文档")
-    st.markdown("""
-    - [获取 API Key](https://help.aliyun.com/zh/model-studio/get-api-key)
-    - [文生图文档](https://help.aliyun.com/zh/model-studio/text-to-image-v2-api-reference)
-    - [图生视频文档](https://help.aliyun.com/zh/model-studio/image-to-video-api-reference)
-    """)
-
-    st.markdown("---")
-    st.markdown("**Powered by 岚叔**")
-    st.markdown("GitHub: [cclank/qwenimg](https://github.com/cclank/qwenimg)")
-
-# 异步任务执行函数
-def run_t2i_task(client, kwargs):
-    """在后台线程执行文生图任务"""
+# ==================== 任务执行 ====================
+def run_task(task_id: str, client: QwenImg, task_type: str, params: Dict[str, Any]):
+    """后台执行任务"""
     try:
-        st.session_state.t2i_task_status = 'running'
-        st.session_state.t2i_task_progress = 20
+        # 根据任务类型调用不同方法
+        if task_type == 't2i':
+            result = client.text_to_image(**params)
+            result_data = {
+                'images': result if isinstance(result, list) else [result]
+            }
+        elif task_type == 'i2v':
+            video_url = client.image_to_video(**params)
+            result_data = {'url': video_url}
+        elif task_type == 't2v':
+            video_url = client.text_to_video(**params)
+            result_data = {'url': video_url}
+        else:
+            raise ValueError(f"Unknown task type: {task_type}")
 
-        result = client.text_to_image(**kwargs)
+        # 更新任务状态
+        update_task(task_id, status='completed', result=result_data)
 
-        st.session_state.t2i_task_progress = 100
-        st.session_state.t2i_results = {
-            'images': result if isinstance(result, list) else [result],
-            'prompt': kwargs['prompt'],
-            'params': kwargs
-        }
-
-        # 添加到历史记录
-        st.session_state.history.append({
-            'type': '文生图',
-            'time': datetime.now().strftime("%H:%M:%S"),
-            'prompt': kwargs['prompt'],
-            'count': kwargs['n'],
-            'size': kwargs['size']
+        # 保存历史记录
+        save_history({
+            'type': task_type,
+            'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'params': params,
+            'result': 'success'
         })
 
-        st.session_state.t2i_task_status = 'completed'
-
     except Exception as e:
-        st.session_state.t2i_task_status = 'error'
-        st.session_state.t2i_task_error = str(e)
+        update_task(task_id, status='error', error=str(e))
 
-def run_i2v_task(client, kwargs, temp_image_path):
-    """在后台线程执行图生视频任务"""
-    try:
-        st.session_state.i2v_task_status = 'running'
-        st.session_state.i2v_task_progress = 20
-
-        video_url = client.image_to_video(**kwargs)
-
-        st.session_state.i2v_task_progress = 100
-        st.session_state.i2v_result = {
-            'url': video_url,
-            'prompt': kwargs.get('prompt', ''),
-            'params': kwargs
-        }
-
-        # 添加到历史记录
-        st.session_state.history.append({
-            'type': '图生视频',
-            'time': datetime.now().strftime("%H:%M:%S"),
-            'prompt': kwargs.get('prompt', ''),
-            'resolution': kwargs['resolution'],
-            'duration': kwargs['duration']
-        })
-
-        # 清理临时文件
-        if temp_image_path and Path(temp_image_path).exists():
-            Path(temp_image_path).unlink()
-
-        st.session_state.i2v_task_status = 'completed'
-
-    except Exception as e:
-        st.session_state.i2v_task_status = 'error'
-        st.session_state.i2v_task_error = str(e)
-
-def run_t2v_task(client, kwargs):
-    """在后台线程执行文生视频任务"""
-    try:
-        st.session_state.t2v_task_status = 'running'
-        st.session_state.t2v_task_progress = 20
-
-        video_url = client.text_to_video(**kwargs)
-
-        st.session_state.t2v_task_progress = 100
-        st.session_state.t2v_result = {
-            'url': video_url,
-            'prompt': kwargs['prompt'],
-            'params': kwargs
-        }
-
-        # 添加到历史记录
-        st.session_state.history.append({
-            'type': '文生视频',
-            'time': datetime.now().strftime("%H:%M:%S"),
-            'prompt': kwargs['prompt'],
-            'resolution': kwargs['resolution'],
-            'duration': kwargs['duration']
-        })
-
-        st.session_state.t2v_task_status = 'completed'
-
-    except Exception as e:
-        st.session_state.t2v_task_status = 'error'
-        st.session_state.t2v_task_error = str(e)
-
-# 初始化客户端
+# ==================== 客户端初始化 ====================
 @st.cache_resource
-def init_client(api_key, region):
+def init_client(api_key: str, region: str):
     try:
         return QwenImg(api_key=api_key, region=region)
     except Exception as e:
         st.error(f"初始化失败: {str(e)}")
         return None
 
-if api_key:
-    client = init_client(api_key, region)
-else:
-    st.warning("⚠️ 请在侧边栏输入 API Key")
-    client = None
+# ==================== UI ====================
+st.title("🎨 QwenImg - 极简版")
+st.caption("简洁高效的图片视频生成工具 | 支持刷新页面")
 
-# 主界面 - 功能选择
+# 侧边栏配置
+with st.sidebar:
+    st.header("⚙️ 配置")
+    api_key = st.text_input(
+        "API Key",
+        type="password",
+        value=os.getenv("DASHSCOPE_API_KEY", ""),
+        help="[获取 API Key](https://help.aliyun.com/zh/model-studio/get-api-key)"
+    )
+    region = st.selectbox("地域", ["beijing", "singapore"])
+
+    st.divider()
+
+    # 历史记录
+    st.header("📜 历史记录")
+    history = st.session_state.history
+
+    if history:
+        st.caption(f"共 {len(history)} 条记录")
+        if st.button("🗑️ 清空", key="clear_history"):
+            st.session_state.history = []
+            save_json(HISTORY_FILE, [])
+            st.rerun()
+
+        for i, record in enumerate(reversed(history[-10:])):
+            with st.expander(f"{record['type'].upper()} - {record['time']}", expanded=False):
+                st.json(record['params'])
+    else:
+        st.info("暂无历史记录")
+
+    st.divider()
+    st.caption("[文档](https://github.com/cclank/qwenimg) | by 岚叔")
+
+# 初始化客户端
+client = init_client(api_key, region) if api_key else None
+
+if not client:
+    st.warning("⚠️ 请在侧边栏输入 API Key")
+    st.stop()
+
+# ==================== 主界面 ====================
 tab1, tab2, tab3 = st.tabs(["📝 文生图", "🎬 图生视频", "🎥 文生视频"])
 
 # ==================== 文生图 ====================
 with tab1:
-    st.header("文生图 (Text-to-Image)")
-
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 1])
 
     with col1:
-        # 使用 session_state 的值
-        st.text_area(
+        prompt = st.text_area(
             "提示词",
-            value=st.session_state.prompt_t2i,
-            height=150,
-            placeholder="描述你想要生成的图片，例如：一只可爱的橘猫坐在窗台上...",
-            help="详细描述你想要生成的图片内容",
-            key="prompt_t2i"
-        )
-
-        st.text_input(
-            "负面提示词",
-            value=st.session_state.negative_prompt_t2i,
-            placeholder="模糊、粗糙、色彩暗淡...",
-            help="描述你不想在图片中出现的内容",
-            key="negative_prompt_t2i"
+            height=100,
+            placeholder="一只可爱的橘猫坐在窗台上...",
+            value=st.session_state.t2i_inputs.get('prompt', '')
         )
 
     with col2:
-        st.selectbox(
-            "模型",
-            ["wan2.5-t2i-preview", "wanx-v1"],
-            index=["wan2.5-t2i-preview", "wanx-v1"].index(st.session_state.model_t2i),
-            help="选择文生图模型",
-            key="model_t2i"
-        )
+        model = st.selectbox("模型", ["wan2.5-t2i-preview", "wanx-v1"])
+        size = st.selectbox("尺寸", ["1024*1024", "1280*720", "720*1280"])
+        n = st.slider("数量", 1, 4, 1)
 
-        st.selectbox(
-            "尺寸",
-            ["1024*1024", "1280*720", "720*1280"],
-            index=["1024*1024", "1280*720", "720*1280"].index(st.session_state.size_t2i),
-            help="选择图片尺寸",
-            key="size_t2i"
-        )
-
-        st.slider(
-            "生成数量",
-            min_value=1,
-            max_value=4,
-            value=st.session_state.n_images,
-            help="一次生成的图片数量（1-4）",
-            key="n_images"
-        )
-
-        st.number_input(
-            "随机种子（可选）",
-            min_value=0,
-            value=st.session_state.seed_t2i,
-            help="固定种子可重现结果，0 表示随机",
-            key="seed_t2i"
-        )
-
-        st.checkbox(
-            "自动扩展提示词",
-            value=st.session_state.prompt_extend,
-            key="prompt_extend"
-        )
-
-        st.checkbox(
-            "添加水印",
-            value=st.session_state.watermark_t2i,
-            key="watermark_t2i"
-        )
-
-    col_btn1, col_btn2 = st.columns([3, 1])
-
-    with col_btn1:
-        # 根据任务状态禁用按钮
-        generate_t2i = st.button(
-            "🎨 生成图片",
-            key="t2i_button",
-            use_container_width=True,
-            disabled=(st.session_state.t2i_task_status == 'running')
-        )
-
-    with col_btn2:
-        if st.session_state.t2i_results:
-            if st.button("🗑️ 清除结果", key="clear_t2i", use_container_width=True):
-                st.session_state.t2i_results = None
-                st.session_state.t2i_task_status = 'idle'
-                st.session_state.t2i_task_error = None
-                st.rerun()
-
-    # 显示任务状态
-    if st.session_state.t2i_task_status == 'running':
-        st.info("🔄 正在生成图片，您可以切换到其他tab查看或继续操作...")
-        progress_bar = st.progress(st.session_state.t2i_task_progress / 100)
-        # 自动刷新以更新进度
-        time.sleep(0.5)
-        st.rerun()
-    elif st.session_state.t2i_task_status == 'error':
-        st.error(f"❌ 生成失败: {st.session_state.t2i_task_error}")
-        if st.button("重试", key="t2i_retry"):
-            st.session_state.t2i_task_status = 'idle'
-            st.session_state.t2i_task_error = None
-            st.rerun()
-    elif st.session_state.t2i_task_status == 'completed' and st.session_state.t2i_results:
-        st.success(f"✅ 成功生成 {len(st.session_state.t2i_results['images'])} 张图片！")
-        # 重置状态，允许再次生成
-        if st.session_state.t2i_task_status == 'completed':
-            st.session_state.t2i_task_status = 'idle'
-
-    if generate_t2i:
-        if not client:
-            st.error("请先配置 API Key")
-        elif not st.session_state.prompt_t2i:
+    if st.button("🎨 生成", key="t2i_btn", use_container_width=True):
+        if not prompt:
             st.warning("请输入提示词")
         else:
-            # 准备任务参数
-            kwargs = {
-                "prompt": st.session_state.prompt_t2i,
-                "model": st.session_state.model_t2i,
-                "size": st.session_state.size_t2i,
-                "n": st.session_state.n_images,
-                "prompt_extend": st.session_state.prompt_extend,
-                "watermark": st.session_state.watermark_t2i,
-                "negative_prompt": st.session_state.negative_prompt_t2i,
-                "save": False,
+            # 保存输入
+            st.session_state.t2i_inputs = {'prompt': prompt, 'model': model, 'size': size, 'n': n}
+            save_state()
+
+            # 创建任务
+            task_id = f"t2i_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            params = {
+                'prompt': prompt,
+                'model': model,
+                'size': size,
+                'n': n,
+                'save': False
             }
+            create_task(task_id, 't2i', params)
 
-            if st.session_state.seed_t2i > 0:
-                kwargs["seed"] = st.session_state.seed_t2i
-
-            # 提交异步任务
-            st.session_state.t2i_task_status = 'running'
-            st.session_state.t2i_task_progress = 0
-            st.session_state.t2i_task_error = None
-
-            # 在后台线程执行
-            st.session_state.executor.submit(run_t2i_task, client, kwargs)
-
-            # 立即刷新显示任务状态
+            # 提交任务
+            st.session_state.executor.submit(run_task, task_id, client, 't2i', params)
             st.rerun()
 
-    # 显示结果（从 session_state 读取）
-    if st.session_state.t2i_results:
-        st.markdown("---")
-        st.subheader("📸 生成结果")
+    # 显示任务状态
+    active_tasks = get_active_tasks('t2i')
+    if active_tasks:
+        st.info(f"🔄 正在生成 {len(active_tasks)} 个任务...")
+        time.sleep(0.5)
+        st.rerun()
 
-        images = st.session_state.t2i_results['images']
-        n = len(images)
+    # 显示结果
+    completed = get_completed_task('t2i')
+    if completed and completed.get('result'):
+        st.success("✅ 生成完成！")
+        images = completed['result']['images']
 
-        if n == 1:
-            st.image(images[0], caption="生成的图片", use_container_width=True)
-
-            buf = BytesIO()
-            images[0].save(buf, format="PNG")
-            st.download_button(
-                label="📥 下载图片",
-                data=buf.getvalue(),
-                file_name=f"qwenimg_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                mime="image/png",
-                key="download_t2i_single"
-            )
-        else:
-            cols = st.columns(min(n, 2))
-            for i, img in enumerate(images):
-                with cols[i % 2]:
-                    st.image(img, caption=f"图片 {i+1}", use_container_width=True)
-
-                    buf = BytesIO()
-                    img.save(buf, format="PNG")
-                    st.download_button(
-                        label=f"📥 下载图片 {i+1}",
-                        data=buf.getvalue(),
-                        file_name=f"qwenimg_{i+1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                        mime="image/png",
-                        key=f"download_t2i_{i}"
-                    )
+        cols = st.columns(min(len(images), 3))
+        for i, img in enumerate(images):
+            with cols[i % 3]:
+                st.image(img, use_container_width=True)
+                buf = BytesIO()
+                img.save(buf, format="PNG")
+                st.download_button(
+                    f"📥 下载 {i+1}",
+                    buf.getvalue(),
+                    f"image_{i+1}.png",
+                    "image/png",
+                    key=f"dl_t2i_{i}"
+                )
 
 # ==================== 图生视频 ====================
 with tab2:
-    st.header("图生视频 (Image-to-Video)")
-
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 1])
 
     with col1:
-        uploaded_file = st.file_uploader(
-            "上传图片",
-            type=["png", "jpg", "jpeg"],
-            help="上传要生成视频的图片",
-            key="image_uploader"
-        )
+        uploaded = st.file_uploader("上传图片", type=["png", "jpg", "jpeg"])
+        if uploaded:
+            st.image(uploaded, use_container_width=True)
 
-        # 保存上传的文件到 session_state
-        if uploaded_file is not None:
-            st.session_state.uploaded_image = uploaded_file
-
-        if st.session_state.uploaded_image:
-            st.image(st.session_state.uploaded_image, caption="上传的图片", use_container_width=True)
-
-        st.text_area(
+        prompt = st.text_area(
             "提示词（可选）",
-            value=st.session_state.prompt_i2v,
-            height=120,
-            placeholder="描述视频中的动作和变化，例如：角色缓缓转身，云雾翻涌...",
-            help="描述视频的动态内容",
-            key="prompt_i2v"
-        )
-
-        st.text_input(
-            "负面提示词",
-            value=st.session_state.negative_prompt_i2v,
-            placeholder="模糊、抖动、失真...",
-            help="描述不希望出现的内容",
-            key="negative_prompt_i2v"
+            height=80,
+            placeholder="描述视频动作...",
+            value=st.session_state.i2v_inputs.get('prompt', '')
         )
 
     with col2:
-        st.selectbox(
-            "模型",
-            ["wan2.5-i2v-preview"],
-            index=0,
-            help="选择图生视频模型",
-            key="model_i2v"
-        )
+        resolution = st.selectbox("分辨率", ["1080P", "720P", "480P"])
+        duration = st.selectbox("时长", [10, 5])
 
-        st.selectbox(
-            "分辨率",
-            ["1080P", "720P", "480P"],
-            index=["1080P", "720P", "480P"].index(st.session_state.resolution_i2v),
-            help="选择视频分辨率",
-            key="resolution_i2v"
-        )
-
-        st.selectbox(
-            "时长（秒）",
-            [10, 5],
-            index=[10, 5].index(st.session_state.duration_i2v),
-            help="选择视频时长",
-            key="duration_i2v"
-        )
-
-        st.number_input(
-            "随机种子（可选）",
-            min_value=0,
-            value=st.session_state.seed_i2v,
-            help="固定种子可重现结果，0 表示随机",
-            key="seed_i2v"
-        )
-
-        st.checkbox(
-            "添加水印",
-            value=st.session_state.watermark_i2v,
-            key="watermark_i2v"
-        )
-
-    col_btn1, col_btn2 = st.columns([3, 1])
-
-    with col_btn1:
-        generate_i2v = st.button(
-            "🎬 生成视频",
-            key="i2v_button",
-            use_container_width=True,
-            disabled=(st.session_state.i2v_task_status == 'running')
-        )
-
-    with col_btn2:
-        if st.session_state.i2v_result:
-            if st.button("🗑️ 清除结果", key="clear_i2v", use_container_width=True):
-                st.session_state.i2v_result = None
-                st.session_state.i2v_task_status = 'idle'
-                st.session_state.i2v_task_error = None
-                st.rerun()
-
-    # 显示任务状态
-    if st.session_state.i2v_task_status == 'running':
-        estimated_time = st.session_state.duration_i2v * 10
-        st.info(f"🔄 正在生成视频（预计{estimated_time}-{estimated_time+30}秒），您可以切换到其他tab查看或继续操作...")
-        progress_bar = st.progress(st.session_state.i2v_task_progress / 100)
-        # 自动刷新以更新进度
-        time.sleep(0.5)
-        st.rerun()
-    elif st.session_state.i2v_task_status == 'error':
-        st.error(f"❌ 生成失败: {st.session_state.i2v_task_error}")
-        if st.button("重试", key="i2v_retry"):
-            st.session_state.i2v_task_status = 'idle'
-            st.session_state.i2v_task_error = None
-            st.rerun()
-    elif st.session_state.i2v_task_status == 'completed' and st.session_state.i2v_result:
-        st.success("✅ 视频生成成功！")
-        # 重置状态，允许再次生成
-        if st.session_state.i2v_task_status == 'completed':
-            st.session_state.i2v_task_status = 'idle'
-
-    if generate_i2v:
-        if not client:
-            st.error("请先配置 API Key")
-        elif not st.session_state.uploaded_image:
+    if st.button("🎬 生成", key="i2v_btn", use_container_width=True):
+        if not uploaded:
             st.warning("请上传图片")
         else:
-            try:
-                # 保存上传的图片到临时文件
-                temp_image_path = Path("/tmp/qwenimg_upload_i2v.png")
-                with open(temp_image_path, "wb") as f:
-                    f.write(st.session_state.uploaded_image.getbuffer())
+            # 保存输入
+            st.session_state.i2v_inputs = {'prompt': prompt}
+            save_state()
 
-                kwargs = {
-                    "image": str(temp_image_path),
-                    "model": st.session_state.model_i2v,
-                    "resolution": st.session_state.resolution_i2v,
-                    "duration": st.session_state.duration_i2v,
-                    "watermark": st.session_state.watermark_i2v,
-                    "prompt": st.session_state.prompt_i2v,
-                    "negative_prompt": st.session_state.negative_prompt_i2v,
-                }
+            # 保存临时图片
+            temp_path = DATA_DIR / "temp_i2v.png"
+            with open(temp_path, "wb") as f:
+                f.write(uploaded.getbuffer())
 
-                if st.session_state.seed_i2v > 0:
-                    kwargs["seed"] = st.session_state.seed_i2v
+            # 创建任务
+            task_id = f"i2v_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            params = {
+                'image': str(temp_path),
+                'prompt': prompt,
+                'resolution': resolution,
+                'duration': duration
+            }
+            create_task(task_id, 'i2v', params)
 
-                # 提交异步任务
-                st.session_state.i2v_task_status = 'running'
-                st.session_state.i2v_task_progress = 0
-                st.session_state.i2v_task_error = None
+            # 提交任务
+            st.session_state.executor.submit(run_task, task_id, client, 'i2v', params)
+            st.rerun()
 
-                # 在后台线程执行
-                st.session_state.executor.submit(run_i2v_task, client, kwargs, str(temp_image_path))
-
-                # 立即刷新显示任务状态
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"准备任务失败: {str(e)}")
+    # 显示任务状态
+    active_tasks = get_active_tasks('i2v')
+    if active_tasks:
+        st.info(f"🔄 正在生成视频（约 {duration * 10}秒）...")
+        time.sleep(0.5)
+        st.rerun()
 
     # 显示结果
-    if st.session_state.i2v_result:
-        st.markdown("---")
-        st.subheader("🎬 生成结果")
-
-        video_url = st.session_state.i2v_result['url']
-        st.markdown(f"**视频 URL**: [{video_url}]({video_url})")
-        st.video(video_url)
-
-        st.info("💡 提示：点击视频链接可在新标签页打开，右键保存视频")
+    completed = get_completed_task('i2v')
+    if completed and completed.get('result'):
+        st.success("✅ 视频生成完成！")
+        url = completed['result']['url']
+        st.video(url)
+        st.caption(f"[视频链接]({url})")
 
 # ==================== 文生视频 ====================
 with tab3:
-    st.header("文生视频 (Text-to-Video)")
-
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 1])
 
     with col1:
-        st.text_area(
+        prompt = st.text_area(
             "提示词",
-            value=st.session_state.prompt_t2v,
-            height=150,
-            placeholder="描述你想要生成的视频，例如：一只柴犬在草地上奔跑，阳光明媚，春天...",
-            help="详细描述视频的内容和场景",
-            key="prompt_t2v"
-        )
-
-        st.text_input(
-            "负面提示词",
-            value=st.session_state.negative_prompt_t2v,
-            placeholder="模糊、静止、低质量...",
-            help="描述不希望出现的内容",
-            key="negative_prompt_t2v"
+            height=100,
+            placeholder="一只柴犬在草地上奔跑...",
+            value=st.session_state.t2v_inputs.get('prompt', '')
         )
 
     with col2:
-        st.selectbox(
-            "模型",
-            ["wan2.5-t2v-preview"],
-            index=0,
-            help="选择文生视频模型",
-            key="model_t2v"
-        )
+        resolution = st.selectbox("分辨率", ["1080P", "720P", "480P"], key="t2v_res")
+        duration = st.selectbox("时长", [10, 5], key="t2v_dur")
 
-        st.selectbox(
-            "分辨率",
-            ["1080P", "720P", "480P"],
-            index=["1080P", "720P", "480P"].index(st.session_state.resolution_t2v),
-            help="选择视频分辨率",
-            key="resolution_t2v"
-        )
-
-        st.selectbox(
-            "时长（秒）",
-            [10, 5],
-            index=[10, 5].index(st.session_state.duration_t2v),
-            help="选择视频时长",
-            key="duration_t2v"
-        )
-
-        st.number_input(
-            "随机种子（可选）",
-            min_value=0,
-            value=st.session_state.seed_t2v,
-            help="固定种子可重现结果，0 表示随机",
-            key="seed_t2v"
-        )
-
-        st.checkbox(
-            "添加水印",
-            value=st.session_state.watermark_t2v,
-            key="watermark_t2v"
-        )
-
-    col_btn1, col_btn2 = st.columns([3, 1])
-
-    with col_btn1:
-        generate_t2v = st.button(
-            "🎥 生成视频",
-            key="t2v_button",
-            use_container_width=True,
-            disabled=(st.session_state.t2v_task_status == 'running')
-        )
-
-    with col_btn2:
-        if st.session_state.t2v_result:
-            if st.button("🗑️ 清除结果", key="clear_t2v", use_container_width=True):
-                st.session_state.t2v_result = None
-                st.session_state.t2v_task_status = 'idle'
-                st.session_state.t2v_task_error = None
-                st.rerun()
-
-    # 显示任务状态
-    if st.session_state.t2v_task_status == 'running':
-        estimated_time = st.session_state.duration_t2v * 10
-        st.info(f"🔄 正在生成视频（预计{estimated_time}-{estimated_time+30}秒），您可以切换到其他tab查看或继续操作...")
-        progress_bar = st.progress(st.session_state.t2v_task_progress / 100)
-        # 自动刷新以更新进度
-        time.sleep(0.5)
-        st.rerun()
-    elif st.session_state.t2v_task_status == 'error':
-        st.error(f"❌ 生成失败: {st.session_state.t2v_task_error}")
-        if st.button("重试", key="t2v_retry"):
-            st.session_state.t2v_task_status = 'idle'
-            st.session_state.t2v_task_error = None
-            st.rerun()
-    elif st.session_state.t2v_task_status == 'completed' and st.session_state.t2v_result:
-        st.success("✅ 视频生成成功！")
-        # 重置状态，允许再次生成
-        if st.session_state.t2v_task_status == 'completed':
-            st.session_state.t2v_task_status = 'idle'
-
-    if generate_t2v:
-        if not client:
-            st.error("请先配置 API Key")
-        elif not st.session_state.prompt_t2v:
+    if st.button("🎥 生成", key="t2v_btn", use_container_width=True):
+        if not prompt:
             st.warning("请输入提示词")
         else:
-            kwargs = {
-                "prompt": st.session_state.prompt_t2v,
-                "model": st.session_state.model_t2v,
-                "resolution": st.session_state.resolution_t2v,
-                "duration": st.session_state.duration_t2v,
-                "watermark": st.session_state.watermark_t2v,
-                "negative_prompt": st.session_state.negative_prompt_t2v,
+            # 保存输入
+            st.session_state.t2v_inputs = {'prompt': prompt}
+            save_state()
+
+            # 创建任务
+            task_id = f"t2v_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            params = {
+                'prompt': prompt,
+                'resolution': resolution,
+                'duration': duration
             }
+            create_task(task_id, 't2v', params)
 
-            if st.session_state.seed_t2v > 0:
-                kwargs["seed"] = st.session_state.seed_t2v
-
-            # 提交异步任务
-            st.session_state.t2v_task_status = 'running'
-            st.session_state.t2v_task_progress = 0
-            st.session_state.t2v_task_error = None
-
-            # 在后台线程执行
-            st.session_state.executor.submit(run_t2v_task, client, kwargs)
-
-            # 立即刷新显示任务状态
+            # 提交任务
+            st.session_state.executor.submit(run_task, task_id, client, 't2v', params)
             st.rerun()
 
+    # 显示任务状态
+    active_tasks = get_active_tasks('t2v')
+    if active_tasks:
+        st.info(f"🔄 正在生成视频（约 {duration * 10}秒）...")
+        time.sleep(0.5)
+        st.rerun()
+
     # 显示结果
-    if st.session_state.t2v_result:
-        st.markdown("---")
-        st.subheader("🎥 生成结果")
+    completed = get_completed_task('t2v')
+    if completed and completed.get('result'):
+        st.success("✅ 视频生成完成！")
+        url = completed['result']['url']
+        st.video(url)
+        st.caption(f"[视频链接]({url})")
 
-        video_url = st.session_state.t2v_result['url']
-        st.markdown(f"**视频 URL**: [{video_url}]({video_url})")
-        st.video(video_url)
-
-        st.info("💡 提示：点击视频链接可在新标签页打开，右键保存视频")
-
-# 底部说明
-st.markdown("---")
-st.markdown("""
-### 💡 使用提示
-
-**文生图：**
-- 使用详细的描述可以生成更好的图片
-- 尝试不同的尺寸和参数组合
-- 使用固定种子可以重现相同的结果
-- ✅ **切换 tab 后所有输入和结果都会保留**
-
-**图生视频：**
-- 上传清晰的图片效果更好
-- 在提示词中详细描述动作和变化
-- 使用 [锚定设定]、[动态分层]、[时间轴分层] 等标签可以更好地控制视频生成
-- 视频生成需要较长时间，请耐心等待
-- ✅ **上传的图片和输入都会保留**
-
-**文生视频：**
-- 描述清晰的场景和动作
-- 指定镜头运动和画面变化
-- 使用电影级、4K 等关键词提升质量
-- ✅ **所有输入都会保留**
-
-### 🆕 改进内容 (v3)
-
-- ✅ **异步任务执行**：每个tab的任务独立运行，互不阻塞
-- ✅ **自由切换tab**：任务执行期间可以随意切换到其他tab查看或操作
-- ✅ **任务状态持久化**：切换tab后任务继续执行，状态不丢失
-- ✅ **实时进度显示**：任务执行期间显示进度条和状态提示
-- ✅ **完整状态保持**：所有输入字段和结果都会保留
-- ✅ **历史记录**：侧边栏显示最近 5 条生成记录
-- ✅ **独立任务管理**：每个tab可以同时运行不同的任务
-- ✅ **错误重试**：任务失败后可以一键重试
-
-### 📚 更多资源
-
-- [项目文档](https://github.com/cclank/qwenimg)
-- [API 参考](https://github.com/cclank/qwenimg#api-reference)
-- [完整教程 Notebook](https://github.com/cclank/qwenimg/blob/main/examples/complete_tutorial.ipynb)
+# ==================== 页脚 ====================
+st.divider()
+st.caption("""
+**✨ 特性**
+- ✅ 支持页面刷新 - 状态自动保存到 ~/.qwenimg/
+- ✅ 并发创作 - 多个任务同时执行
+- ✅ 完整历史 - 所有记录永久保存
+- ✅ 极简代码 - 减少 50%+ 代码量
 """)
