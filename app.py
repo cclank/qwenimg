@@ -23,6 +23,8 @@ from PIL import Image
 import threading
 import queue
 import time
+import json
+import pickle
 
 # 添加项目路径
 project_root = Path(__file__).parent
@@ -30,6 +32,12 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from qwenimg import QwenImg
+
+# 持久化存储目录
+CACHE_DIR = project_root / ".streamlit_cache"
+CACHE_DIR.mkdir(exist_ok=True)
+HISTORY_FILE = CACHE_DIR / "history.json"
+RESULTS_FILE = CACHE_DIR / "results.pkl"
 
 # ==================== 页面配置 ====================
 st.set_page_config(
@@ -370,6 +378,8 @@ def check_and_process_results():
                         'count': st.session_state.t2i_results['params']['n'],
                         'size': st.session_state.t2i_results['params']['size']
                     })
+                    save_history()  # 保存历史记录
+                    save_results()  # 保存结果
                 else:
                     st.session_state.t2i_task_error = result_data['error']
                     st.session_state.t2i_task_status = 'error'
@@ -387,6 +397,8 @@ def check_and_process_results():
                         'resolution': st.session_state.i2v_result['params']['resolution'],
                         'duration': st.session_state.i2v_result['params']['duration']
                     })
+                    save_history()  # 保存历史记录
+                    save_results()  # 保存结果
                 else:
                     st.session_state.i2v_task_error = result_data['error']
                     st.session_state.i2v_task_status = 'error'
@@ -404,6 +416,8 @@ def check_and_process_results():
                         'resolution': st.session_state.t2v_result['params']['resolution'],
                         'duration': st.session_state.t2v_result['params']['duration']
                     })
+                    save_history()  # 保存历史记录
+                    save_results()  # 保存结果
                 else:
                     st.session_state.t2v_task_error = result_data['error']
                     st.session_state.t2v_task_status = 'error'
@@ -415,17 +429,64 @@ def check_and_process_results():
 
     return has_new_results
 
+# ==================== 持久化函数 ====================
+
+def save_history():
+    """保存历史记录到文件"""
+    try:
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存历史记录失败: {e}")
+
+def load_history():
+    """从文件加载历史记录"""
+    try:
+        if HISTORY_FILE.exists():
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"加载历史记录失败: {e}")
+    return []
+
+def save_results():
+    """保存所有结果到文件"""
+    try:
+        results = {
+            't2i_results': st.session_state.t2i_results,
+            'i2v_result': st.session_state.i2v_result,
+            't2v_result': st.session_state.t2v_result,
+        }
+        with open(RESULTS_FILE, 'wb') as f:
+            pickle.dump(results, f)
+    except Exception as e:
+        print(f"保存结果失败: {e}")
+
+def load_results():
+    """从文件加载结果"""
+    try:
+        if RESULTS_FILE.exists():
+            with open(RESULTS_FILE, 'rb') as f:
+                return pickle.load(f)
+    except Exception as e:
+        print(f"加载结果失败: {e}")
+    return {}
+
 # ==================== 工具函数 ====================
 
 def init_session_state():
     """统一初始化session state"""
+    # 加载持久化的历史记录和结果
+    saved_history = load_history()
+    saved_results = load_results()
+
     # 全局状态
     defaults = {
-        'history': [],
+        'history': saved_history if saved_history else [],
         'last_check_time': time.time(),
 
         # 文生图
-        't2i_results': None,
+        't2i_results': saved_results.get('t2i_results'),
         't2i_task_status': None,  # None, 'running', 'completed', 'error'
         't2i_task_error': None,
         'prompt_t2i': "",
@@ -438,7 +499,7 @@ def init_session_state():
         'watermark_t2i': False,
 
         # 图生视频
-        'i2v_result': None,
+        'i2v_result': saved_results.get('i2v_result'),
         'i2v_task_status': None,
         'i2v_task_error': None,
         'uploaded_image': None,
@@ -451,7 +512,7 @@ def init_session_state():
         'watermark_i2v': False,
 
         # 文生视频
-        't2v_result': None,
+        't2v_result': saved_results.get('t2v_result'),
         't2v_task_status': None,
         't2v_task_error': None,
         'prompt_t2v': "",
@@ -598,6 +659,15 @@ with st.sidebar:
     # 任务队列显示
     st.markdown("### 🔄 任务队列")
 
+    # 刷新警告
+    running_count = sum([
+        st.session_state.t2i_task_status == 'running',
+        st.session_state.i2v_task_status == 'running',
+        st.session_state.t2v_task_status == 'running'
+    ])
+    if running_count > 0:
+        st.warning(f"⚠️ {running_count}个任务运行中，请勿刷新页面！")
+
     running_tasks = []
     if st.session_state.t2i_task_status == 'running':
         running_tasks.append(("📝 文生图", "执行中..."))
@@ -633,19 +703,22 @@ with st.sidebar:
         with col2:
             if st.button("清空", key="clear_history", use_container_width=True):
                 st.session_state.history = []
+                save_history()  # 保存空历史记录
                 st.rerun()
 
         st.markdown("")
 
         # 显示最近10条
-        for record in reversed(st.session_state.history[-10:]):
+        for idx, record in enumerate(reversed(st.session_state.history[-10:])):
             type_emoji = {"文生图": "📝", "图生视频": "🎬", "文生视频": "🎥"}
+            tab_hint = {"文生图": "Tab1", "图生视频": "Tab2", "文生视频": "Tab3"}
             emoji = type_emoji.get(record['type'], "📝")
+            tab_location = tab_hint.get(record['type'], "")
 
             with st.container():
                 st.markdown(f"""
                 <div class="history-item">
-                    <div class="history-time">{emoji} {record['time']}</div>
+                    <div class="history-time">{emoji} {record['time']} <span style="color: #9ca3af; font-size: 0.75rem;">({tab_location})</span></div>
                     <div class="history-content">{record.get('prompt', 'N/A')[:50]}...</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -803,6 +876,7 @@ with tab1:
             # 更新任务状态
             st.session_state.t2i_task_status = 'running'
             st.session_state.t2i_task_error = None
+            st.toast("🎨 文生图任务已提交！正在后台执行中...", icon="✅")
             st.rerun()
 
     # 显示任务状态
@@ -810,12 +884,17 @@ with tab1:
         st.info("✨ 文生图任务正在后台执行中，您可以切换到其他tab继续创作其他任务")
     elif st.session_state.t2i_task_status == 'completed':
         st.success(f"✅ 生成成功！已生成 {len(st.session_state.t2i_results['images'])} 张图片")
-        # 自动清除completed状态，允许再次生成
-        st.session_state.t2i_task_status = None
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("确认", key="ack_t2i_complete", use_container_width=True):
+                st.session_state.t2i_task_status = None
+                st.rerun()
     elif st.session_state.t2i_task_status == 'error':
         show_status_message("生成失败", st.session_state.t2i_task_error, "error")
-        # 自动清除error状态，允许重试
-        st.session_state.t2i_task_status = None
+        if st.button("重试", key="retry_t2i", type="primary"):
+            st.session_state.t2i_task_status = None
+            st.session_state.t2i_task_error = None
+            st.rerun()
 
     # 显示结果
     if st.session_state.t2i_results:
@@ -993,6 +1072,8 @@ with tab2:
                 # 更新任务状态
                 st.session_state.i2v_task_status = 'running'
                 st.session_state.i2v_task_error = None
+                estimated = st.session_state.duration_i2v * 10
+                st.toast(f"🎬 图生视频任务已提交！预计 {estimated}-{estimated+30} 秒完成", icon="✅")
                 st.rerun()
 
             except Exception as e:
@@ -1004,12 +1085,17 @@ with tab2:
         st.info(f"✨ 图生视频任务正在后台执行中（预计 {estimated}-{estimated+30} 秒），您可以切换到其他tab继续创作其他任务")
     elif st.session_state.i2v_task_status == 'completed':
         st.success("✅ 生成成功！视频已生成完成")
-        # 自动清除completed状态，允许再次生成
-        st.session_state.i2v_task_status = None
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("确认", key="ack_i2v_complete", use_container_width=True):
+                st.session_state.i2v_task_status = None
+                st.rerun()
     elif st.session_state.i2v_task_status == 'error':
         show_status_message("生成失败", st.session_state.i2v_task_error, "error")
-        # 自动清除error状态，允许重试
-        st.session_state.i2v_task_status = None
+        if st.button("重试", key="retry_i2v", type="primary"):
+            st.session_state.i2v_task_status = None
+            st.session_state.i2v_task_error = None
+            st.rerun()
 
     # 显示结果
     if st.session_state.i2v_result:
@@ -1139,6 +1225,8 @@ with tab3:
             # 更新任务状态
             st.session_state.t2v_task_status = 'running'
             st.session_state.t2v_task_error = None
+            estimated = st.session_state.duration_t2v * 10
+            st.toast(f"🎥 文生视频任务已提交！预计 {estimated}-{estimated+30} 秒完成", icon="✅")
             st.rerun()
 
     # 显示任务状态
@@ -1147,12 +1235,17 @@ with tab3:
         st.info(f"✨ 文生视频任务正在后台执行中（预计 {estimated}-{estimated+30} 秒），您可以切换到其他tab继续创作其他任务")
     elif st.session_state.t2v_task_status == 'completed':
         st.success("✅ 生成成功！视频已生成完成")
-        # 自动清除completed状态，允许再次生成
-        st.session_state.t2v_task_status = None
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("确认", key="ack_t2v_complete", use_container_width=True):
+                st.session_state.t2v_task_status = None
+                st.rerun()
     elif st.session_state.t2v_task_status == 'error':
         show_status_message("生成失败", st.session_state.t2v_task_error, "error")
-        # 自动清除error状态，允许重试
-        st.session_state.t2v_task_status = None
+        if st.button("重试", key="retry_t2v", type="primary"):
+            st.session_state.t2v_task_status = None
+            st.session_state.t2v_task_error = None
+            st.rerun()
 
     # 显示结果
     if st.session_state.t2v_result:
