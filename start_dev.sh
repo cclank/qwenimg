@@ -50,19 +50,41 @@ fi
 echo ""
 echo "📦 检查Python依赖..."
 
-# 检查是否有虚拟环境
+# 检查是否有虚拟环境并激活
 if [ -d "venv" ]; then
     echo "✅ 发现虚拟环境，激活中..."
     source venv/bin/activate
+elif [ -d ".venv" ]; then
+    echo "✅ 发现虚拟环境，激活中..."
+    source .venv/bin/activate
 fi
 
-# 检查uvicorn是否已安装
-if ! python3 -c "import uvicorn" 2>/dev/null; then
-    echo "📥 安装Python依赖（从根目录）..."
+# 显示当前Python路径
+echo "📍 当前Python: $(which python3)"
+
+# 检查关键依赖是否已安装
+MISSING_DEPS=false
+for module in uvicorn fastapi sqlalchemy dashscope; do
+    if ! python3 -c "import $module" 2>/dev/null; then
+        echo "⚠️  缺少依赖: $module"
+        MISSING_DEPS=true
+    fi
+done
+
+# 如果有缺失的依赖，安装所有依赖
+if [ "$MISSING_DEPS" = true ]; then
+    echo "📥 安装Python依赖（从根目录 requirements.txt）..."
     if ! pip3 install -r requirements.txt; then
         echo "❌ Python依赖安装失败"
-        echo "   请手动运行："
-        echo "   pip3 install -r requirements.txt"
+        echo ""
+        echo "💡 建议："
+        echo "   1. 使用虚拟环境："
+        echo "      python3 -m venv venv"
+        echo "      source venv/bin/activate"
+        echo "      pip3 install -r requirements.txt"
+        echo "   2. 或者直接安装："
+        echo "      pip3 install -r requirements.txt"
+        echo ""
         exit 1
     fi
     echo "✅ Python依赖安装成功"
@@ -115,7 +137,7 @@ if ! ps -p $BACKEND_PID > /dev/null; then
     echo "----------------------------------------"
     echo ""
     echo "💡 常见问题："
-    echo "   1. 检查是否安装了所有依赖: cd backend && pip3 install -r requirements.txt"
+    echo "   1. 检查是否安装了所有依赖: pip3 install -r requirements.txt"
     echo "   2. 检查端口8000是否被占用: lsof -i :8000"
     echo "   3. 检查API Key是否配置正确"
     echo "   4. 查看完整日志: cat logs/backend.log"
