@@ -1,11 +1,12 @@
 """
-QwenImg Web UI - 基于 Streamlit 的 Web 界面（改进版）
+QwenImg Web UI - 基于 Streamlit 的 Web 界面（完全修复版）
 
 运行方式：
     streamlit run app.py
 
 改进内容：
     - 使用 session_state 保存结果，切换 tab 不会丢失
+    - 保存所有输入字段，切换后历史输入保留
     - 添加历史记录功能
     - 改进用户体验
 """
@@ -33,21 +34,67 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 初始化 session_state
+# 初始化 session_state - 结果存储
 if 'history' not in st.session_state:
     st.session_state.history = []
-
 if 't2i_results' not in st.session_state:
     st.session_state.t2i_results = None
-
 if 'i2v_result' not in st.session_state:
     st.session_state.i2v_result = None
-
 if 't2v_result' not in st.session_state:
     st.session_state.t2v_result = None
-
 if 'uploaded_image' not in st.session_state:
     st.session_state.uploaded_image = None
+
+# 初始化 session_state - 文生图输入字段
+if 'prompt_t2i' not in st.session_state:
+    st.session_state.prompt_t2i = ""
+if 'negative_prompt_t2i' not in st.session_state:
+    st.session_state.negative_prompt_t2i = ""
+if 'model_t2i' not in st.session_state:
+    st.session_state.model_t2i = "wan2.5-t2i-preview"
+if 'size_t2i' not in st.session_state:
+    st.session_state.size_t2i = "1024*1024"
+if 'n_images' not in st.session_state:
+    st.session_state.n_images = 1
+if 'seed_t2i' not in st.session_state:
+    st.session_state.seed_t2i = 0
+if 'prompt_extend' not in st.session_state:
+    st.session_state.prompt_extend = True
+if 'watermark_t2i' not in st.session_state:
+    st.session_state.watermark_t2i = False
+
+# 初始化 session_state - 图生视频输入字段
+if 'prompt_i2v' not in st.session_state:
+    st.session_state.prompt_i2v = ""
+if 'negative_prompt_i2v' not in st.session_state:
+    st.session_state.negative_prompt_i2v = ""
+if 'model_i2v' not in st.session_state:
+    st.session_state.model_i2v = "wan2.5-i2v-preview"
+if 'resolution_i2v' not in st.session_state:
+    st.session_state.resolution_i2v = "1080P"
+if 'duration_i2v' not in st.session_state:
+    st.session_state.duration_i2v = 10
+if 'seed_i2v' not in st.session_state:
+    st.session_state.seed_i2v = 0
+if 'watermark_i2v' not in st.session_state:
+    st.session_state.watermark_i2v = False
+
+# 初始化 session_state - 文生视频输入字段
+if 'prompt_t2v' not in st.session_state:
+    st.session_state.prompt_t2v = ""
+if 'negative_prompt_t2v' not in st.session_state:
+    st.session_state.negative_prompt_t2v = ""
+if 'model_t2v' not in st.session_state:
+    st.session_state.model_t2v = "wan2.5-t2v-preview"
+if 'resolution_t2v' not in st.session_state:
+    st.session_state.resolution_t2v = "1080P"
+if 'duration_t2v' not in st.session_state:
+    st.session_state.duration_t2v = 10
+if 'seed_t2v' not in st.session_state:
+    st.session_state.seed_t2v = 0
+if 'watermark_t2v' not in st.session_state:
+    st.session_state.watermark_t2v = False
 
 # 自定义 CSS
 st.markdown("""
@@ -180,55 +227,69 @@ with tab1:
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        prompt_t2i = st.text_area(
+        # 使用 session_state 的值
+        st.session_state.prompt_t2i = st.text_area(
             "提示词",
+            value=st.session_state.prompt_t2i,
             height=150,
             placeholder="描述你想要生成的图片，例如：一只可爱的橘猫坐在窗台上...",
             help="详细描述你想要生成的图片内容",
             key="prompt_t2i_input"
         )
 
-        negative_prompt_t2i = st.text_input(
+        st.session_state.negative_prompt_t2i = st.text_input(
             "负面提示词",
+            value=st.session_state.negative_prompt_t2i,
             placeholder="模糊、粗糙、色彩暗淡...",
             help="描述你不想在图片中出现的内容",
             key="negative_t2i_input"
         )
 
     with col2:
-        model_t2i = st.selectbox(
+        st.session_state.model_t2i = st.selectbox(
             "模型",
             ["wan2.5-t2i-preview", "wanx-v1"],
+            index=["wan2.5-t2i-preview", "wanx-v1"].index(st.session_state.model_t2i),
             help="选择文生图模型",
             key="model_t2i_select"
         )
 
-        size_t2i = st.selectbox(
+        st.session_state.size_t2i = st.selectbox(
             "尺寸",
             ["1024*1024", "1280*720", "720*1280"],
+            index=["1024*1024", "1280*720", "720*1280"].index(st.session_state.size_t2i),
             help="选择图片尺寸",
             key="size_t2i_select"
         )
 
-        n_images = st.slider(
+        st.session_state.n_images = st.slider(
             "生成数量",
             min_value=1,
             max_value=4,
-            value=1,
+            value=st.session_state.n_images,
             help="一次生成的图片数量（1-4）",
             key="n_images_slider"
         )
 
-        seed_t2i = st.number_input(
+        st.session_state.seed_t2i = st.number_input(
             "随机种子（可选）",
             min_value=0,
-            value=0,
+            value=st.session_state.seed_t2i,
             help="固定种子可重现结果，0 表示随机",
             key="seed_t2i_input"
         )
 
-        prompt_extend = st.checkbox("自动扩展提示词", value=True, key="prompt_extend_check")
-        watermark_t2i = st.checkbox("添加水印", value=False, key="watermark_t2i_check")
+        st.session_state.prompt_extend = st.checkbox(
+            "自动扩展提示词",
+            value=st.session_state.prompt_extend,
+            key="prompt_extend_check"
+        )
+
+        st.session_state.watermark_t2i = st.checkbox(
+            "添加水印",
+            value=st.session_state.watermark_t2i,
+            key="watermark_t2i_check"
+        )
 
     col_btn1, col_btn2 = st.columns([3, 1])
 
@@ -244,31 +305,31 @@ with tab1:
     if generate_t2i:
         if not client:
             st.error("请先配置 API Key")
-        elif not prompt_t2i:
+        elif not st.session_state.prompt_t2i:
             st.warning("请输入提示词")
         else:
             with st.spinner("正在生成图片，请稍候..."):
                 try:
                     kwargs = {
-                        "prompt": prompt_t2i,
-                        "model": model_t2i,
-                        "size": size_t2i,
-                        "n": n_images,
-                        "prompt_extend": prompt_extend,
-                        "watermark": watermark_t2i,
-                        "negative_prompt": negative_prompt_t2i,
+                        "prompt": st.session_state.prompt_t2i,
+                        "model": st.session_state.model_t2i,
+                        "size": st.session_state.size_t2i,
+                        "n": st.session_state.n_images,
+                        "prompt_extend": st.session_state.prompt_extend,
+                        "watermark": st.session_state.watermark_t2i,
+                        "negative_prompt": st.session_state.negative_prompt_t2i,
                         "save": False,
                     }
 
-                    if seed_t2i > 0:
-                        kwargs["seed"] = seed_t2i
+                    if st.session_state.seed_t2i > 0:
+                        kwargs["seed"] = st.session_state.seed_t2i
 
                     result = client.text_to_image(**kwargs)
 
                     # 保存到 session_state
                     st.session_state.t2i_results = {
                         'images': result if isinstance(result, list) else [result],
-                        'prompt': prompt_t2i,
+                        'prompt': st.session_state.prompt_t2i,
                         'params': kwargs
                     }
 
@@ -276,12 +337,12 @@ with tab1:
                     st.session_state.history.append({
                         'type': '文生图',
                         'time': datetime.now().strftime("%H:%M:%S"),
-                        'prompt': prompt_t2i,
-                        'count': n_images,
-                        'size': size_t2i
+                        'prompt': st.session_state.prompt_t2i,
+                        'count': st.session_state.n_images,
+                        'size': st.session_state.size_t2i
                     })
 
-                    st.success(f"✅ 成功生成 {n_images} 张图片！")
+                    st.success(f"✅ 成功生成 {st.session_state.n_images} 张图片！")
                     st.rerun()
 
                 except Exception as e:
@@ -344,52 +405,61 @@ with tab2:
         if st.session_state.uploaded_image:
             st.image(st.session_state.uploaded_image, caption="上传的图片", use_container_width=True)
 
-        prompt_i2v = st.text_area(
+        st.session_state.prompt_i2v = st.text_area(
             "提示词（可选）",
+            value=st.session_state.prompt_i2v,
             height=120,
             placeholder="描述视频中的动作和变化，例如：角色缓缓转身，云雾翻涌...",
             help="描述视频的动态内容",
             key="prompt_i2v_input"
         )
 
-        negative_prompt_i2v = st.text_input(
+        st.session_state.negative_prompt_i2v = st.text_input(
             "负面提示词",
+            value=st.session_state.negative_prompt_i2v,
             placeholder="模糊、抖动、失真...",
             help="描述不希望出现的内容",
             key="negative_i2v_input"
         )
 
     with col2:
-        model_i2v = st.selectbox(
+        st.session_state.model_i2v = st.selectbox(
             "模型",
             ["wan2.5-i2v-preview"],
+            index=0,
             help="选择图生视频模型",
             key="model_i2v_select"
         )
 
-        resolution_i2v = st.selectbox(
+        st.session_state.resolution_i2v = st.selectbox(
             "分辨率",
             ["1080P", "720P", "480P"],
+            index=["1080P", "720P", "480P"].index(st.session_state.resolution_i2v),
             help="选择视频分辨率",
             key="resolution_i2v_select"
         )
 
-        duration_i2v = st.selectbox(
+        st.session_state.duration_i2v = st.selectbox(
             "时长（秒）",
             [10, 5],
+            index=[10, 5].index(st.session_state.duration_i2v),
             help="选择视频时长",
             key="duration_i2v_select"
         )
 
-        seed_i2v = st.number_input(
+        st.session_state.seed_i2v = st.number_input(
             "随机种子（可选）",
             min_value=0,
-            value=0,
+            value=st.session_state.seed_i2v,
             help="固定种子可重现结果，0 表示随机",
             key="seed_i2v_input"
         )
 
-        watermark_i2v = st.checkbox("添加水印", value=False, key="watermark_i2v_check")
+        st.session_state.watermark_i2v = st.checkbox(
+            "添加水印",
+            value=st.session_state.watermark_i2v,
+            key="watermark_i2v_check"
+        )
 
     col_btn1, col_btn2 = st.columns([3, 1])
 
@@ -409,7 +479,7 @@ with tab2:
             st.warning("请上传图片")
         else:
             # 显示预估时间
-            estimated_time = duration_i2v * 10  # 粗略估计
+            estimated_time = st.session_state.duration_i2v * 10
             st.info(f"⏱️ 预计需要 {estimated_time}-{estimated_time+30} 秒，请耐心等待...")
 
             progress_bar = st.progress(0)
@@ -426,16 +496,16 @@ with tab2:
 
                 kwargs = {
                     "image": str(temp_image_path),
-                    "model": model_i2v,
-                    "resolution": resolution_i2v,
-                    "duration": duration_i2v,
-                    "watermark": watermark_i2v,
-                    "prompt": prompt_i2v,
-                    "negative_prompt": negative_prompt_i2v,
+                    "model": st.session_state.model_i2v,
+                    "resolution": st.session_state.resolution_i2v,
+                    "duration": st.session_state.duration_i2v,
+                    "watermark": st.session_state.watermark_i2v,
+                    "prompt": st.session_state.prompt_i2v,
+                    "negative_prompt": st.session_state.negative_prompt_i2v,
                 }
 
-                if seed_i2v > 0:
-                    kwargs["seed"] = seed_i2v
+                if st.session_state.seed_i2v > 0:
+                    kwargs["seed"] = st.session_state.seed_i2v
 
                 progress_bar.progress(20)
                 status_text.text("正在生成视频...")
@@ -448,7 +518,7 @@ with tab2:
                 # 保存到 session_state
                 st.session_state.i2v_result = {
                     'url': video_url,
-                    'prompt': prompt_i2v,
+                    'prompt': st.session_state.prompt_i2v,
                     'params': kwargs
                 }
 
@@ -456,9 +526,9 @@ with tab2:
                 st.session_state.history.append({
                     'type': '图生视频',
                     'time': datetime.now().strftime("%H:%M:%S"),
-                    'prompt': prompt_i2v,
-                    'resolution': resolution_i2v,
-                    'duration': duration_i2v
+                    'prompt': st.session_state.prompt_i2v,
+                    'resolution': st.session_state.resolution_i2v,
+                    'duration': st.session_state.duration_i2v
                 })
 
                 # 清理临时文件
@@ -491,52 +561,61 @@ with tab3:
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        prompt_t2v = st.text_area(
+        st.session_state.prompt_t2v = st.text_area(
             "提示词",
+            value=st.session_state.prompt_t2v,
             height=150,
             placeholder="描述你想要生成的视频，例如：一只柴犬在草地上奔跑，阳光明媚，春天...",
             help="详细描述视频的内容和场景",
             key="prompt_t2v_input"
         )
 
-        negative_prompt_t2v = st.text_input(
+        st.session_state.negative_prompt_t2v = st.text_input(
             "负面提示词",
+            value=st.session_state.negative_prompt_t2v,
             placeholder="模糊、静止、低质量...",
             help="描述不希望出现的内容",
             key="negative_t2v_input"
         )
 
     with col2:
-        model_t2v = st.selectbox(
+        st.session_state.model_t2v = st.selectbox(
             "模型",
             ["wan2.5-t2v-preview"],
+            index=0,
             help="选择文生视频模型",
             key="model_t2v_select"
         )
 
-        resolution_t2v = st.selectbox(
+        st.session_state.resolution_t2v = st.selectbox(
             "分辨率",
             ["1080P", "720P", "480P"],
+            index=["1080P", "720P", "480P"].index(st.session_state.resolution_t2v),
             help="选择视频分辨率",
             key="resolution_t2v_select"
         )
 
-        duration_t2v = st.selectbox(
+        st.session_state.duration_t2v = st.selectbox(
             "时长（秒）",
             [10, 5],
+            index=[10, 5].index(st.session_state.duration_t2v),
             help="选择视频时长",
             key="duration_t2v_select"
         )
 
-        seed_t2v = st.number_input(
+        st.session_state.seed_t2v = st.number_input(
             "随机种子（可选）",
             min_value=0,
-            value=0,
+            value=st.session_state.seed_t2v,
             help="固定种子可重现结果，0 表示随机",
             key="seed_t2v_input"
         )
 
-        watermark_t2v = st.checkbox("添加水印", value=False, key="watermark_t2v_check")
+        st.session_state.watermark_t2v = st.checkbox(
+            "添加水印",
+            value=st.session_state.watermark_t2v,
+            key="watermark_t2v_check"
+        )
 
     col_btn1, col_btn2 = st.columns([3, 1])
 
@@ -552,11 +631,11 @@ with tab3:
     if generate_t2v:
         if not client:
             st.error("请先配置 API Key")
-        elif not prompt_t2v:
+        elif not st.session_state.prompt_t2v:
             st.warning("请输入提示词")
         else:
             # 显示预估时间
-            estimated_time = duration_t2v * 10
+            estimated_time = st.session_state.duration_t2v * 10
             st.info(f"⏱️ 预计需要 {estimated_time}-{estimated_time+30} 秒，请耐心等待...")
 
             progress_bar = st.progress(0)
@@ -564,16 +643,16 @@ with tab3:
 
             try:
                 kwargs = {
-                    "prompt": prompt_t2v,
-                    "model": model_t2v,
-                    "resolution": resolution_t2v,
-                    "duration": duration_t2v,
-                    "watermark": watermark_t2v,
-                    "negative_prompt": negative_prompt_t2v,
+                    "prompt": st.session_state.prompt_t2v,
+                    "model": st.session_state.model_t2v,
+                    "resolution": st.session_state.resolution_t2v,
+                    "duration": st.session_state.duration_t2v,
+                    "watermark": st.session_state.watermark_t2v,
+                    "negative_prompt": st.session_state.negative_prompt_t2v,
                 }
 
-                if seed_t2v > 0:
-                    kwargs["seed"] = seed_t2v
+                if st.session_state.seed_t2v > 0:
+                    kwargs["seed"] = st.session_state.seed_t2v
 
                 progress_bar.progress(20)
                 status_text.text("正在生成视频...")
@@ -586,7 +665,7 @@ with tab3:
                 # 保存到 session_state
                 st.session_state.t2v_result = {
                     'url': video_url,
-                    'prompt': prompt_t2v,
+                    'prompt': st.session_state.prompt_t2v,
                     'params': kwargs
                 }
 
@@ -594,9 +673,9 @@ with tab3:
                 st.session_state.history.append({
                     'type': '文生视频',
                     'time': datetime.now().strftime("%H:%M:%S"),
-                    'prompt': prompt_t2v,
-                    'resolution': resolution_t2v,
-                    'duration': duration_t2v
+                    'prompt': st.session_state.prompt_t2v,
+                    'resolution': st.session_state.resolution_t2v,
+                    'duration': st.session_state.duration_t2v
                 })
 
                 st.success("✅ 视频生成成功！")
@@ -627,22 +706,24 @@ st.markdown("""
 - 使用详细的描述可以生成更好的图片
 - 尝试不同的尺寸和参数组合
 - 使用固定种子可以重现相同的结果
-- 切换 tab 后结果会保留，不会丢失
+- ✅ **切换 tab 后所有输入和结果都会保留**
 
 **图生视频：**
 - 上传清晰的图片效果更好
 - 在提示词中详细描述动作和变化
 - 使用 [锚定设定]、[动态分层]、[时间轴分层] 等标签可以更好地控制视频生成
 - 视频生成需要较长时间，请耐心等待
+- ✅ **上传的图片和输入都会保留**
 
 **文生视频：**
 - 描述清晰的场景和动作
 - 指定镜头运动和画面变化
 - 使用电影级、4K 等关键词提升质量
+- ✅ **所有输入都会保留**
 
 ### 🆕 改进内容
 
-- ✅ **状态保持**：切换 tab 后结果不会丢失
+- ✅ **完整状态保持**：切换 tab 后所有输入字段和结果都会保留
 - ✅ **历史记录**：侧边栏显示最近 5 条生成记录
 - ✅ **进度提示**：视频生成时显示进度条和预估时间
 - ✅ **清除功能**：每个 tab 可单独清除结果
