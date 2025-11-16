@@ -25,7 +25,6 @@ import { inspirationAPI } from '@/services/api';
 import type { Inspiration as InspirationType } from '@/types';
 
 const { Text, Paragraph } = Typography;
-const { TabPane } = Tabs;
 
 export const Inspiration: React.FC = () => {
   const [inspirations, setInspirations] = useState<InspirationType[]>([]);

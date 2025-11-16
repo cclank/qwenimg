@@ -3,8 +3,8 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-# 加载环境变量
-load_dotenv()
+# 加载环境变量 - 运行时环境变量优先于.env文件
+load_dotenv(override=False)  # override=False 表示不覆盖已存在的环境变量
 
 if __name__ == "__main__":
     # 从环境变量读取配置

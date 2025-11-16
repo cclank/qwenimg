@@ -13,26 +13,8 @@ export const useWebSocket = () => {
   const wsRef = useRef<WebSocketService | null>(null);
 
   useEffect(() => {
-    // 创建WebSocket连接
-    const ws = new WebSocketService(sessionId);
-    wsRef.current = ws;
-
-    // 订阅消息
-    const unsubscribe = ws.onMessage((msg: WSMessage) => {
-      handleMessage(msg);
-    });
-
-    // 连接
-    ws.connect();
-
-    // 清理
-    return () => {
-      unsubscribe();
-      ws.disconnect();
-    };
-  }, [sessionId]);
-
-  const handleMessage = (msg: WSMessage) => {
+    // 处理WebSocket消息
+    const handleMessage = (msg: WSMessage) => {
     switch (msg.type) {
       case 'connected':
         console.log('WebSocket已连接:', msg.session_id);
@@ -78,7 +60,24 @@ export const useWebSocket = () => {
       default:
         console.log('Unknown message type:', msg.type);
     }
-  };
+    };
+
+    // 创建WebSocket连接
+    const ws = new WebSocketService(sessionId);
+    wsRef.current = ws;
+
+    // 订阅消息
+    const unsubscribe = ws.onMessage(handleMessage);
+
+    // 连接
+    ws.connect();
+
+    // 清理
+    return () => {
+      unsubscribe();
+      ws.disconnect();
+    };
+  }, [sessionId, updateTask]);
 
   return wsRef.current;
 };
