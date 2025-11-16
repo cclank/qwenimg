@@ -33,13 +33,12 @@ echo "✅ Node.js版本: $(node --version)"
 echo "✅ npm版本: $(npm --version)"
 echo ""
 
-# 安装后端依赖
-echo "📦 安装后端Python依赖..."
-cd backend
+# 安装Python依赖
+echo "📦 安装Python依赖（从根目录）..."
 
 if ! pip3 install -r requirements.txt; then
     echo ""
-    echo "❌ 后端依赖安装失败"
+    echo "❌ Python依赖安装失败"
     echo ""
     echo "💡 建议："
     echo "   1. 使用虚拟环境（推荐）："
@@ -53,8 +52,7 @@ if ! pip3 install -r requirements.txt; then
     exit 1
 fi
 
-cd ..
-echo "✅ 后端依赖安装成功"
+echo "✅ Python依赖安装成功"
 echo ""
 
 # 安装前端依赖
@@ -83,17 +81,17 @@ echo ""
 
 # 配置环境变量
 echo "🔑 配置API Key..."
-if [ ! -f "backend/.env" ]; then
-    echo "📝 创建 backend/.env 文件..."
-    cp backend/.env.example backend/.env
+if [ ! -f ".env" ]; then
+    echo "📝 创建根目录 .env 文件..."
+    cp .env.example .env
     echo ""
-    echo "⚠️  请编辑 backend/.env 文件，填入你的API Key："
-    echo "   nano backend/.env  # 或使用其他编辑器"
+    echo "⚠️  请编辑 .env 文件，填入你的API Key："
+    echo "   nano .env  # 或使用其他编辑器"
     echo ""
     echo "   或者设置环境变量（推荐）："
     echo "   export DASHSCOPE_API_KEY=\"your_api_key_here\""
 else
-    echo "✅ backend/.env 文件已存在"
+    echo "✅ .env 文件已存在"
 fi
 
 echo ""
