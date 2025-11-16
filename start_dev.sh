@@ -46,9 +46,9 @@ else
     echo "✅ API Key已配置"
 fi
 
-# 检查并安装后端依赖
+# 检查依赖（不自动安装）
 echo ""
-echo "📦 检查Python依赖..."
+echo "📦 检查依赖..."
 
 # 检查是否有虚拟环境并激活
 if [ -d "venv" ]; then
@@ -59,56 +59,65 @@ elif [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
 
-# 显示当前Python路径
 echo "📍 当前Python: $(which python3)"
 
-# 检查关键依赖是否已安装
-MISSING_DEPS=false
+# 检查Python依赖
+echo ""
+echo "🔍 检查Python依赖..."
+MISSING_PYTHON_DEPS=false
 for module in uvicorn fastapi sqlalchemy dashscope; do
     if ! python3 -c "import $module" 2>/dev/null; then
-        echo "⚠️  缺少依赖: $module"
-        MISSING_DEPS=true
+        echo "❌ 缺少依赖: $module"
+        MISSING_PYTHON_DEPS=true
     fi
 done
 
-# 如果有缺失的依赖，安装所有依赖
-if [ "$MISSING_DEPS" = true ]; then
-    echo "📥 安装Python依赖（从根目录 requirements.txt）..."
-    if ! pip3 install -r requirements.txt; then
-        echo "❌ Python依赖安装失败"
-        echo ""
-        echo "💡 建议："
-        echo "   1. 使用虚拟环境："
-        echo "      python3 -m venv venv"
-        echo "      source venv/bin/activate"
-        echo "      pip3 install -r requirements.txt"
-        echo "   2. 或者直接安装："
-        echo "      pip3 install -r requirements.txt"
-        echo ""
-        exit 1
-    fi
-    echo "✅ Python依赖安装成功"
-else
-    echo "✅ Python依赖已安装"
+if [ "$MISSING_PYTHON_DEPS" = true ]; then
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════╗"
+    echo "║  ⚠️  请先安装Python依赖！                             ║"
+    echo "╚═══════════════════════════════════════════════════════╝"
+    echo ""
+    echo "📝 安装步骤："
+    echo ""
+    echo "方式1：使用虚拟环境（推荐）"
+    echo "  python3 -m venv venv"
+    echo "  source venv/bin/activate"
+    echo "  pip install -r requirements.txt"
+    echo ""
+    echo "方式2：直接安装"
+    echo "  pip3 install -r requirements.txt"
+    echo ""
+    echo "或者运行安装脚本："
+    echo "  ./install.sh"
+    echo ""
+    exit 1
 fi
 
-# 检查并安装前端依赖
+echo "✅ Python依赖已安装"
+
+# 检查前端依赖
 echo ""
-echo "📦 检查前端依赖..."
+echo "🔍 检查前端依赖..."
 if [ ! -d "frontend/node_modules" ]; then
-    echo "📥 安装前端依赖..."
-    cd frontend
-    if ! npm install; then
-        echo "❌ 前端依赖安装失败"
-        echo "   请手动运行："
-        echo "   cd frontend && npm install"
-        exit 1
-    fi
-    cd ..
-    echo "✅ 前端依赖安装成功"
-else
-    echo "✅ 前端依赖已安装"
+    echo "❌ 前端依赖未安装"
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════╗"
+    echo "║  ⚠️  请先安装前端依赖！                               ║"
+    echo "╚═══════════════════════════════════════════════════════╝"
+    echo ""
+    echo "📝 安装步骤："
+    echo "  cd frontend"
+    echo "  npm install"
+    echo "  cd .."
+    echo ""
+    echo "或者运行安装脚本："
+    echo "  ./install.sh"
+    echo ""
+    exit 1
 fi
+
+echo "✅ 前端依赖已安装"
 
 # 创建日志目录
 mkdir -p logs
