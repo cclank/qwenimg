@@ -188,11 +188,65 @@ def apply_custom_styles():
         .stTabs [data-baseweb="tab-panel"] {
             animation: none !important;
             transition: none !important;
+            opacity: 1 !important;
         }
 
         /* 禁用所有过渡和动画效果 */
         .main .block-container {
             transition: none !important;
+        }
+
+        /* 确保内容始终不透明，防止任务执行时变浅 */
+        .main, .main * {
+            opacity: 1 !important;
+        }
+
+        /* 禁用spinner时的页面淡化效果 */
+        .stSpinner ~ div {
+            opacity: 1 !important;
+        }
+
+        /* 强制所有元素保持完全不透明 */
+        .element-container,
+        .stMarkdown,
+        .stText,
+        .stButton,
+        .stTextInput,
+        .stTextArea,
+        .stSelectbox,
+        .stNumberInput,
+        .stCheckbox,
+        .stImage,
+        .stVideo {
+            opacity: 1 !important;
+            transition: none !important;
+        }
+
+        /* 禁用Streamlit的加载遮罩 */
+        .stApp > header + div {
+            opacity: 1 !important;
+        }
+
+        /* 禁用所有可能的遮罩层 */
+        div[data-testid="stAppViewContainer"] > div,
+        div[data-testid="stAppViewContainer"] * {
+            opacity: 1 !important;
+        }
+
+        /* 确保Tab内容区域不会变淡 */
+        .stTabs [data-baseweb="tab-panel"] > div {
+            opacity: 1 !important;
+            filter: none !important;
+        }
+
+        /* 仅移除可能导致页面变淡的blur和brightness滤镜 */
+        .main * {
+            backdrop-filter: none !important;
+        }
+
+        /* Spinner自定义样式 - 不影响页面其他部分 */
+        .stSpinner {
+            background-color: transparent !important;
         }
 
         /* 侧边栏样式 */
