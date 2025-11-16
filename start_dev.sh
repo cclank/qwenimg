@@ -28,17 +28,17 @@ fi
 # 检查API Key环境变量
 echo "🔑 检查API Key配置..."
 if [ -z "$DASHSCOPE_API_KEY" ]; then
-    if [ -f "backend/.env" ]; then
+    if [ -f ".env" ]; then
         echo "⚠️  警告：未设置 DASHSCOPE_API_KEY 环境变量"
-        echo "    将使用 backend/.env 文件中的配置"
+        echo "    将使用 .env 文件中的配置"
     else
         echo "⚠️  警告：未设置 DASHSCOPE_API_KEY 环境变量且未找到 .env 文件"
         echo "    正在从示例复制 .env 文件..."
-        cp backend/.env.example backend/.env
+        cp .env.example .env
         echo ""
         echo "❌ 请先配置API Key："
         echo "   方式1（推荐）：export DASHSCOPE_API_KEY=\"your_api_key\""
-        echo "   方式2：编辑 backend/.env 文件"
+        echo "   方式2：编辑项目根目录的 .env 文件"
         echo ""
         exit 1
     fi
@@ -48,8 +48,7 @@ fi
 
 # 检查并安装后端依赖
 echo ""
-echo "📦 检查后端Python依赖..."
-cd backend
+echo "📦 检查Python依赖..."
 
 # 检查是否有虚拟环境
 if [ -d "venv" ]; then
@@ -59,19 +58,17 @@ fi
 
 # 检查uvicorn是否已安装
 if ! python3 -c "import uvicorn" 2>/dev/null; then
-    echo "📥 安装后端依赖..."
+    echo "📥 安装Python依赖（从根目录）..."
     if ! pip3 install -r requirements.txt; then
-        echo "❌ 后端依赖安装失败"
+        echo "❌ Python依赖安装失败"
         echo "   请手动运行："
-        echo "   cd backend && pip3 install -r requirements.txt"
+        echo "   pip3 install -r requirements.txt"
         exit 1
     fi
-    echo "✅ 后端依赖安装成功"
+    echo "✅ Python依赖安装成功"
 else
-    echo "✅ 后端依赖已安装"
+    echo "✅ Python依赖已安装"
 fi
-
-cd ..
 
 # 检查并安装前端依赖
 echo ""

@@ -76,8 +76,8 @@ export DASHSCOPE_API_KEY="sk-your-api-key-here"
 
 **方式B：配置文件**
 ```bash
-# 编辑backend/.env文件
-nano backend/.env
+# 编辑根目录的.env文件
+nano .env
 
 # 修改这一行：
 DASHSCOPE_API_KEY=sk-your-api-key-here
@@ -97,22 +97,24 @@ DASHSCOPE_API_KEY=sk-your-api-key-here
 
 ## 📝 手动启动
 
-### 步骤1：启动后端
+### 步骤1：安装后端依赖
 
 ```bash
-# 进入后端目录
-cd backend
+# 在项目根目录安装Python依赖
+pip3 install -r requirements.txt
 
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境变量
+# 配置API Key（二选一）
 export DASHSCOPE_API_KEY="your_api_key_here"
-# 或者创建.env文件
-echo "DASHSCOPE_API_KEY=your_api_key_here" > .env
+# 或者编辑.env文件
+nano .env
+```
 
-# 启动后端
-python run.py
+### 步骤2：启动后端
+
+```bash
+# 启动后端服务
+cd backend
+python3 run.py
 ```
 
 后端将在 **http://localhost:8000** 启动
