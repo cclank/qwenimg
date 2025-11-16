@@ -190,10 +190,6 @@ with st.sidebar:
 
     st.divider()
 
-    # 手动刷新按钮
-    if st.button("🔄 刷新结果", use_container_width=True, help="点击查看最新任务结果"):
-        st.rerun()
-
     if st.button("🗑️ 清空所有", use_container_width=True):
         save_tasks([])
         # 删除所有图片文件
@@ -252,7 +248,22 @@ with tab1:
 
                 task_id = create_task('t2i', params)
                 st.session_state.executor.submit(run_task, task_id, api_key, region, 't2i', params)
-                st.success(f"✅ 任务已提交")
+
+                # 等待任务完成
+                status_placeholder = st.empty()
+                status_placeholder.info("⏳ 正在生成中，请稍候...")
+
+                max_wait = 60  # 最多等待60秒
+                for i in range(max_wait):
+                    time.sleep(1)
+                    tasks = load_tasks()
+                    current_task = next((t for t in tasks if t['id'] == task_id), None)
+                    if current_task and current_task['status'] != 'running':
+                        break
+
+                status_placeholder.empty()
+                st.success("✅ 任务完成！")
+                time.sleep(1)
                 st.rerun()
 
     st.divider()
@@ -348,7 +359,22 @@ with tab2:
 
                 task_id = create_task('i2v', params)
                 st.session_state.executor.submit(run_task, task_id, api_key, region, 'i2v', params)
-                st.success("✅ 任务已提交")
+
+                # 等待任务完成
+                status_placeholder = st.empty()
+                status_placeholder.info("⏳ 正在生成中，请稍候...")
+
+                max_wait = 120  # 视频生成最多等待120秒
+                for i in range(max_wait):
+                    time.sleep(1)
+                    tasks = load_tasks()
+                    current_task = next((t for t in tasks if t['id'] == task_id), None)
+                    if current_task and current_task['status'] != 'running':
+                        break
+
+                status_placeholder.empty()
+                st.success("✅ 任务完成！")
+                time.sleep(1)
                 st.rerun()
 
     st.divider()
@@ -420,7 +446,22 @@ with tab3:
 
                 task_id = create_task('t2v', params)
                 st.session_state.executor.submit(run_task, task_id, api_key, region, 't2v', params)
-                st.success("✅ 任务已提交")
+
+                # 等待任务完成
+                status_placeholder = st.empty()
+                status_placeholder.info("⏳ 正在生成中，请稍候...")
+
+                max_wait = 120  # 视频生成最多等待120秒
+                for i in range(max_wait):
+                    time.sleep(1)
+                    tasks = load_tasks()
+                    current_task = next((t for t in tasks if t['id'] == task_id), None)
+                    if current_task and current_task['status'] != 'running':
+                        break
+
+                status_placeholder.empty()
+                st.success("✅ 任务完成！")
+                time.sleep(1)
                 st.rerun()
 
     st.divider()
