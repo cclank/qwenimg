@@ -126,13 +126,15 @@ def run_task(task_id: str, api_key: str, region: str, task_type: str, params: Di
         client = QwenImg(api_key=api_key, region=region)
 
         if task_type == 't2i':
-            result = client.text_to_image(**params)
-            # 保存图片到本地
-            image_paths = []
-            for i, img_url in enumerate(result['images']):
-                img_path = DATA_DIR / f"{task_id}_{i}.png"
-                client.save_image(img_url, str(img_path))
-                image_paths.append(str(img_path))
+            # 让 SDK 自动保存到指定目录并返回文件路径
+            params['save'] = True
+            params['return_pil'] = False
+            params['output_dir'] = str(DATA_DIR)
+
+            image_paths = client.text_to_image(**params)
+            # text_to_image 返回的是文件路径列表
+            if not isinstance(image_paths, list):
+                image_paths = [image_paths]
 
             update_task(task_id, {
                 'status': 'completed',
@@ -224,6 +226,8 @@ with tab1:
             prompt_extend = st.checkbox("自动扩展提示词", value=True, key="t2i_extend")
             watermark = st.checkbox("添加水印", value=False, key="t2i_wm")
 
+    # 生成按钮放在提示词下方
+    with left_col:
         if st.button("🎨 开始生成", use_container_width=True, type="primary"):
             if not prompt:
                 st.warning("请输入提示词")
@@ -235,8 +239,7 @@ with tab1:
                     'n': n,
                     'negative_prompt': negative_prompt,
                     'prompt_extend': prompt_extend,
-                    'watermark': watermark,
-                    'save': False
+                    'watermark': watermark
                 }
                 if seed > 0:
                     params['seed'] = seed
@@ -315,6 +318,8 @@ with tab2:
             seed = st.number_input("随机种子（0=随机）", min_value=0, value=0, key="i2v_seed")
             watermark = st.checkbox("添加水印", value=False, key="i2v_wm")
 
+    # 生成按钮放在提示词下方
+    with left_col:
         if st.button("🎬 开始生成", use_container_width=True, type="primary"):
             if not uploaded:
                 st.warning("请上传图片")
@@ -390,6 +395,8 @@ with tab3:
             seed = st.number_input("随机种子（0=随机）", min_value=0, value=0, key="t2v_seed")
             watermark = st.checkbox("添加水印", value=False, key="t2v_wm")
 
+    # 生成按钮放在提示词下方
+    with left_col:
         if st.button("🎥 开始生成", use_container_width=True, type="primary"):
             if not prompt:
                 st.warning("请输入提示词")
