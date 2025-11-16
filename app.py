@@ -39,19 +39,25 @@ st.set_page_config(
     layout="wide"
 )
 
-# 自定义 CSS
+# 自定义 CSS - 限制图片视频高度
 st.markdown("""
 <style>
     .stale { opacity: 1.0 !important; }
     .element-container { opacity: 1.0 !important; }
     [data-testid="stale-element-container"] { opacity: 1.0 !important; }
     * { transition: none !important; }
+
+    /* 限制图片和视频的最大高度 */
+    img, video {
+        max-height: 70vh !important;
+        object-fit: contain !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==================== 初始化状态 ====================
-if 'status_filter' not in st.session_state:
-    st.session_state.status_filter = None  # None, 'running', 'completed', 'error'
+if 'jump_to_status' not in st.session_state:
+    st.session_state.jump_to_status = None
 
 # ==================== 文件操作（线程安全）====================
 def load_tasks() -> List[Dict]:
@@ -106,15 +112,10 @@ def update_task(task_id: str, **kwargs):
             break
     save_tasks(tasks)
 
-def get_tasks_by_type(task_type: str, status_filter: Optional[str] = None) -> List[Dict]:
-    """获取指定类型的任务，支持状态筛选"""
+def get_tasks_by_type(task_type: str) -> List[Dict]:
+    """获取指定类型的任务"""
     tasks = load_tasks()
     filtered = [t for t in tasks if t['type'] == task_type]
-
-    # 应用状态筛选
-    if status_filter:
-        filtered = [t for t in filtered if t['status'] == status_filter]
-
     return list(reversed(filtered))  # 最新的在前
 
 def has_running_tasks() -> bool:
@@ -195,34 +196,24 @@ with st.sidebar:
 
     st.header("📊 统计")
 
-    # 可点击的统计指标
+    # 可点击跳转的统计指标
     col1, col2 = st.columns(2)
     with col1:
-        if st.button(f"📋 总任务\n{total}", use_container_width=True, key="filter_all"):
-            st.session_state.status_filter = None
-            st.rerun()
-        if st.button(f"⏳ 运行中\n{running}", use_container_width=True, key="filter_running",
-                     type="primary" if st.session_state.status_filter == 'running' else "secondary"):
-            st.session_state.status_filter = 'running'
-            st.rerun()
+        if st.button(f"📋 总任务\n{total}", use_container_width=True, key="jump_all"):
+            st.session_state.jump_to_status = 'all'
+        if st.button(f"⏳ 运行中\n{running}", use_container_width=True, key="jump_running",
+                     disabled=(running == 0)):
+            st.session_state.jump_to_status = 'running'
     with col2:
-        if st.button(f"✅ 已完成\n{completed}", use_container_width=True, key="filter_completed",
-                     type="primary" if st.session_state.status_filter == 'completed' else "secondary"):
-            st.session_state.status_filter = 'completed'
-            st.rerun()
-        if st.button(f"❌ 失败\n{errors}", use_container_width=True, key="filter_error",
-                     type="primary" if st.session_state.status_filter == 'error' else "secondary"):
-            st.session_state.status_filter = 'error'
-            st.rerun()
+        if st.button(f"✅ 已完成\n{completed}", use_container_width=True, key="jump_completed",
+                     disabled=(completed == 0)):
+            st.session_state.jump_to_status = 'completed'
+        if st.button(f"❌ 失败\n{errors}", use_container_width=True, key="jump_error",
+                     disabled=(errors == 0)):
+            st.session_state.jump_to_status = 'error'
 
-    # 显示当前筛选状态
-    if st.session_state.status_filter:
-        filter_text = {
-            'running': '⏳ 运行中',
-            'completed': '✅ 已完成',
-            'error': '❌ 失败'
-        }
-        st.info(f"当前筛选: {filter_text[st.session_state.status_filter]}")
+    if st.session_state.jump_to_status and st.session_state.jump_to_status != 'all':
+        st.info(f"💡 点击后自动跳转到第一个{st.session_state.jump_to_status}状态的任务")
 
     st.divider()
 
@@ -289,11 +280,28 @@ with tab1:
     st.divider()
     st.subheader("任务列表")
 
-    tasks = get_tasks_by_type('t2i', st.session_state.status_filter)
+    tasks = get_tasks_by_type('t2i')
     if not tasks:
-        st.info("暂无任务" if not st.session_state.status_filter else f"暂无{st.session_state.status_filter}状态的任务")
+        st.info("暂无任务")
     else:
+        # 标记是否已跳转
+        jumped = False
+
         for task in tasks:
+            # 为每个状态添加锚点
+            status = task['status']
+            if not jumped and st.session_state.jump_to_status == status:
+                # 使用 HTML 锚点标记
+                st.markdown(f'<div id="jump-target"></div>', unsafe_allow_html=True)
+                # 滚动到此位置
+                st.markdown("""
+                <script>
+                    document.getElementById('jump-target').scrollIntoView({behavior: 'smooth'});
+                </script>
+                """, unsafe_allow_html=True)
+                jumped = True
+                st.session_state.jump_to_status = None  # 清除跳转标记
+
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
@@ -386,11 +394,24 @@ with tab2:
     st.divider()
     st.subheader("任务列表")
 
-    tasks = get_tasks_by_type('i2v', st.session_state.status_filter)
+    tasks = get_tasks_by_type('i2v')
     if not tasks:
-        st.info("暂无任务" if not st.session_state.status_filter else f"暂无{st.session_state.status_filter}状态的任务")
+        st.info("暂无任务")
     else:
+        jumped = False
+
         for task in tasks:
+            status = task['status']
+            if not jumped and st.session_state.jump_to_status == status:
+                st.markdown(f'<div id="jump-target"></div>', unsafe_allow_html=True)
+                st.markdown("""
+                <script>
+                    document.getElementById('jump-target').scrollIntoView({behavior: 'smooth'});
+                </script>
+                """, unsafe_allow_html=True)
+                jumped = True
+                st.session_state.jump_to_status = None
+
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
@@ -455,11 +476,24 @@ with tab3:
     st.divider()
     st.subheader("任务列表")
 
-    tasks = get_tasks_by_type('t2v', st.session_state.status_filter)
+    tasks = get_tasks_by_type('t2v')
     if not tasks:
-        st.info("暂无任务" if not st.session_state.status_filter else f"暂无{st.session_state.status_filter}状态的任务")
+        st.info("暂无任务")
     else:
+        jumped = False
+
         for task in tasks:
+            status = task['status']
+            if not jumped and st.session_state.jump_to_status == status:
+                st.markdown(f'<div id="jump-target"></div>', unsafe_allow_html=True)
+                st.markdown("""
+                <script>
+                    document.getElementById('jump-target').scrollIntoView({behavior: 'smooth'});
+                </script>
+                """, unsafe_allow_html=True)
+                jumped = True
+                st.session_state.jump_to_status = None
+
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
