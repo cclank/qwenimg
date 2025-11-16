@@ -46,78 +46,14 @@ else
     echo "✅ API Key已配置"
 fi
 
-# 检查依赖（不自动安装）
-echo ""
-echo "📦 检查依赖..."
-
-# 检查是否有虚拟环境并激活
+# 激活虚拟环境（如果存在）
 if [ -d "venv" ]; then
-    echo "✅ 发现虚拟环境，激活中..."
+    echo "✅ 激活虚拟环境 venv"
     source venv/bin/activate
 elif [ -d ".venv" ]; then
-    echo "✅ 发现虚拟环境，激活中..."
+    echo "✅ 激活虚拟环境 .venv"
     source .venv/bin/activate
 fi
-
-echo "📍 当前Python: $(which python3)"
-
-# 检查Python依赖
-echo ""
-echo "🔍 检查Python依赖..."
-MISSING_PYTHON_DEPS=false
-for module in uvicorn fastapi sqlalchemy dashscope; do
-    if ! python3 -c "import $module" 2>/dev/null; then
-        echo "❌ 缺少依赖: $module"
-        MISSING_PYTHON_DEPS=true
-    fi
-done
-
-if [ "$MISSING_PYTHON_DEPS" = true ]; then
-    echo ""
-    echo "╔═══════════════════════════════════════════════════════╗"
-    echo "║  ⚠️  请先安装Python依赖！                             ║"
-    echo "╚═══════════════════════════════════════════════════════╝"
-    echo ""
-    echo "📝 安装步骤："
-    echo ""
-    echo "方式1：使用虚拟环境（推荐）"
-    echo "  python3 -m venv venv"
-    echo "  source venv/bin/activate"
-    echo "  pip install -r requirements.txt"
-    echo ""
-    echo "方式2：直接安装"
-    echo "  pip3 install -r requirements.txt"
-    echo ""
-    echo "或者运行安装脚本："
-    echo "  ./install.sh"
-    echo ""
-    exit 1
-fi
-
-echo "✅ Python依赖已安装"
-
-# 检查前端依赖
-echo ""
-echo "🔍 检查前端依赖..."
-if [ ! -d "frontend/node_modules" ]; then
-    echo "❌ 前端依赖未安装"
-    echo ""
-    echo "╔═══════════════════════════════════════════════════════╗"
-    echo "║  ⚠️  请先安装前端依赖！                               ║"
-    echo "╚═══════════════════════════════════════════════════════╝"
-    echo ""
-    echo "📝 安装步骤："
-    echo "  cd frontend"
-    echo "  npm install"
-    echo "  cd .."
-    echo ""
-    echo "或者运行安装脚本："
-    echo "  ./install.sh"
-    echo ""
-    exit 1
-fi
-
-echo "✅ 前端依赖已安装"
 
 # 创建日志目录
 mkdir -p logs
@@ -145,11 +81,12 @@ if ! ps -p $BACKEND_PID > /dev/null; then
     tail -20 logs/backend.log
     echo "----------------------------------------"
     echo ""
-    echo "💡 常见问题："
-    echo "   1. 检查是否安装了所有依赖: pip3 install -r requirements.txt"
-    echo "   2. 检查端口8000是否被占用: lsof -i :8000"
-    echo "   3. 检查API Key是否配置正确"
-    echo "   4. 查看完整日志: cat logs/backend.log"
+    echo "💡 可能原因："
+    echo "   1. 依赖未安装，请运行: ./install.sh"
+    echo "   2. 端口8000被占用: lsof -i :8000"
+    echo "   3. API Key配置错误"
+    echo ""
+    echo "📖 查看完整日志: cat logs/backend.log"
     exit 1
 fi
 
@@ -196,10 +133,11 @@ if ! ps -p $FRONTEND_PID > /dev/null; then
     tail -20 logs/frontend.log
     echo "----------------------------------------"
     echo ""
-    echo "💡 常见问题："
-    echo "   1. 检查是否安装了依赖: cd frontend && npm install"
-    echo "   2. 检查端口3000是否被占用: lsof -i :3000"
-    echo "   3. 查看完整日志: cat logs/frontend.log"
+    echo "💡 可能原因："
+    echo "   1. 依赖未安装，请运行: ./install.sh"
+    echo "   2. 端口3000被占用: lsof -i :3000"
+    echo ""
+    echo "📖 查看完整日志: cat logs/frontend.log"
     echo ""
     echo "🛑 停止后端服务..."
     kill $BACKEND_PID 2>/dev/null
