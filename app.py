@@ -9,7 +9,6 @@ QwenImg Web UI - 简洁可用版
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 import os
 import sys
 import json
@@ -197,36 +196,14 @@ with st.sidebar:
 
     st.header("📊 统计")
 
-    # 可点击跳转的统计指标
+    # 简单的统计显示
     col1, col2 = st.columns(2)
     with col1:
-        if st.button(f"📋 总任务\n{total}", use_container_width=True, key="jump_all"):
-            st.session_state.jump_to_status = 'all'
-        if st.button(f"⏳ 运行中\n{running}", use_container_width=True, key="jump_running",
-                     disabled=(running == 0)):
-            st.session_state.jump_to_status = 'running'
+        st.metric("📋 总任务", total)
+        st.metric("⏳ 运行中", running)
     with col2:
-        if st.button(f"✅ 已完成\n{completed}", use_container_width=True, key="jump_completed",
-                     disabled=(completed == 0)):
-            st.session_state.jump_to_status = 'completed'
-        if st.button(f"❌ 失败\n{errors}", use_container_width=True, key="jump_error",
-                     disabled=(errors == 0)):
-            st.session_state.jump_to_status = 'error'
-
-    # 如果设置了跳转目标，执行 JavaScript 滚动
-    if st.session_state.jump_to_status and st.session_state.jump_to_status != 'all':
-        target_id = f"task-{st.session_state.jump_to_status}"
-        components.html(f"""
-        <script>
-            setTimeout(function() {{
-                const element = window.parent.document.getElementById('{target_id}');
-                if (element) {{
-                    element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
-                }}
-            }}, 100);
-        </script>
-        """, height=0)
-        st.session_state.jump_to_status = None
+        st.metric("✅ 已完成", completed)
+        st.metric("❌ 失败", errors)
 
     st.divider()
 
@@ -297,17 +274,7 @@ with tab1:
     if not tasks:
         st.info("暂无任务")
     else:
-        # 记录每个状态的第一个任务
-        status_first_seen = set()
-
         for task in tasks:
-            status = task['status']
-
-            # 为每个状态的第一个任务添加 id 锚点
-            if status not in status_first_seen:
-                st.markdown(f'<div id="task-{status}"></div>', unsafe_allow_html=True)
-                status_first_seen.add(status)
-
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
@@ -404,17 +371,7 @@ with tab2:
     if not tasks:
         st.info("暂无任务")
     else:
-        # 记录每个状态的第一个任务
-        status_first_seen = set()
-
         for task in tasks:
-            status = task['status']
-
-            # 为每个状态的第一个任务添加 id 锚点
-            if status not in status_first_seen:
-                st.markdown(f'<div id="task-{status}"></div>', unsafe_allow_html=True)
-                status_first_seen.add(status)
-
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
@@ -483,17 +440,7 @@ with tab3:
     if not tasks:
         st.info("暂无任务")
     else:
-        # 记录每个状态的第一个任务
-        status_first_seen = set()
-
         for task in tasks:
-            status = task['status']
-
-            # 为每个状态的第一个任务添加 id 锚点
-            if status not in status_first_seen:
-                st.markdown(f'<div id="task-{status}"></div>', unsafe_allow_html=True)
-                status_first_seen.add(status)
-
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
