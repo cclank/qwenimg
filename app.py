@@ -1,12 +1,11 @@
 """
 QwenImg Web UI - 简洁可用版
 
-核心特性：
-✅ 所有配置项全保留
-✅ 多任务并发执行
-✅ 自动刷新显示结果
-✅ 页面不闪烁
-✅ 支持页面刷新
+设计思路：
+- 完全基于文件持久化，不依赖 session_state
+- 后台线程直接读写文件
+- 主线程每次渲染时重新加载文件
+- 使用文件锁避免并发冲突
 """
 
 import streamlit as st
@@ -18,8 +17,8 @@ from io import BytesIO
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, List
-import threading
 import time
+import filelock
 
 # 添加项目路径
 project_root = Path(__file__).parent
@@ -32,6 +31,7 @@ from qwenimg import QwenImg
 DATA_DIR = Path.home() / ".qwenimg"
 DATA_DIR.mkdir(exist_ok=True)
 TASKS_FILE = DATA_DIR / "tasks.json"
+LOCK_FILE = DATA_DIR / "tasks.lock"
 
 st.set_page_config(
     page_title="QwenImg",
@@ -39,55 +39,42 @@ st.set_page_config(
     layout="wide"
 )
 
-# 自定义 CSS - 禁用页面变浅效果
+# 自定义 CSS
 st.markdown("""
 <style>
-    /* 禁用 Streamlit 的 stale 元素变浅效果 */
-    .stale {
-        opacity: 1.0 !important;
-    }
-    .element-container {
-        opacity: 1.0 !important;
-    }
-    [data-testid="stale-element-container"] {
-        opacity: 1.0 !important;
-    }
-    /* 禁用所有元素的 opacity 变化 */
-    * {
-        transition: none !important;
-    }
+    .stale { opacity: 1.0 !important; }
+    .element-container { opacity: 1.0 !important; }
+    [data-testid="stale-element-container"] { opacity: 1.0 !important; }
+    * { transition: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== 持久化 ====================
-def load_tasks():
-    """加载任务列表"""
-    if TASKS_FILE.exists():
-        try:
-            with open(TASKS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            pass
+# ==================== 文件操作（线程安全）====================
+def load_tasks() -> List[Dict]:
+    """从文件加载任务（线程安全）"""
+    lock = filelock.FileLock(str(LOCK_FILE), timeout=10)
+    try:
+        with lock:
+            if TASKS_FILE.exists():
+                with open(TASKS_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+    except Exception as e:
+        st.error(f"加载任务失败: {e}")
     return []
 
 def save_tasks(tasks: List[Dict]):
-    """保存任务列表"""
-    if len(tasks) > 50:
-        tasks = tasks[-50:]
-    with open(TASKS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(tasks, f, ensure_ascii=False, indent=2)
+    """保存任务到文件（线程安全）"""
+    lock = filelock.FileLock(str(LOCK_FILE), timeout=10)
+    try:
+        with lock:
+            # 只保留最近 50 个任务
+            if len(tasks) > 50:
+                tasks = tasks[-50:]
+            with open(TASKS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(tasks, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"保存任务失败: {e}")
 
-# ==================== 初始化 ====================
-if 'executor' not in st.session_state:
-    st.session_state.executor = ThreadPoolExecutor(max_workers=3)
-
-if 'tasks' not in st.session_state:
-    st.session_state.tasks = load_tasks()
-
-if 'task_lock' not in st.session_state:
-    st.session_state.task_lock = threading.Lock()
-
-# ==================== 任务管理 ====================
 def create_task(task_type: str, params: Dict[str, Any]) -> str:
     """创建新任务"""
     task_id = f"{task_type}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
@@ -100,59 +87,78 @@ def create_task(task_type: str, params: Dict[str, Any]) -> str:
         'error': None,
         'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-    with st.session_state.task_lock:
-        st.session_state.tasks.append(task)
-        save_tasks(st.session_state.tasks)
+
+    tasks = load_tasks()
+    tasks.append(task)
+    save_tasks(tasks)
     return task_id
 
 def update_task(task_id: str, **kwargs):
-    """更新任务"""
-    with st.session_state.task_lock:
-        for task in st.session_state.tasks:
-            if task['id'] == task_id:
-                task.update(kwargs)
-                save_tasks(st.session_state.tasks)
-                break
+    """更新任务状态"""
+    tasks = load_tasks()
+    for task in tasks:
+        if task['id'] == task_id:
+            task.update(kwargs)
+            break
+    save_tasks(tasks)
 
 def get_tasks_by_type(task_type: str) -> List[Dict]:
-    """获取指定类型的任务（倒序）"""
-    with st.session_state.task_lock:
-        tasks = [t for t in st.session_state.tasks if t['type'] == task_type]
-    return list(reversed(tasks))
+    """获取指定类型的任务"""
+    tasks = load_tasks()
+    filtered = [t for t in tasks if t['type'] == task_type]
+    return list(reversed(filtered))  # 最新的在前
 
 def has_running_tasks() -> bool:
     """检查是否有运行中的任务"""
-    with st.session_state.task_lock:
-        return any(t['status'] == 'running' for t in st.session_state.tasks)
+    tasks = load_tasks()
+    return any(t['status'] == 'running' for t in tasks)
 
 # ==================== 任务执行 ====================
-def run_task(task_id: str, client: QwenImg, task_type: str, params: Dict[str, Any]):
+def run_task(task_id: str, api_key: str, region: str, task_type: str, params: Dict[str, Any]):
     """后台执行任务"""
     try:
+        # 初始化客户端
+        client = QwenImg(api_key=api_key, region=region)
+
+        # 执行任务
         if task_type == 't2i':
             result = client.text_to_image(**params)
-            result_data = {'images': result if isinstance(result, list) else [result]}
+            # 保存图片到本地，存储路径
+            images = result if isinstance(result, list) else [result]
+            image_paths = []
+            for i, img in enumerate(images):
+                img_path = DATA_DIR / f"{task_id}_{i}.png"
+                img.save(img_path)
+                image_paths.append(str(img_path))
+            result_data = {'image_paths': image_paths}
+
         elif task_type == 'i2v':
             url = client.image_to_video(**params)
             result_data = {'url': url}
+
         elif task_type == 't2v':
             url = client.text_to_video(**params)
             result_data = {'url': url}
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 
+        # 更新任务状态为完成
         update_task(task_id, status='completed', result=result_data)
 
     except Exception as e:
+        # 更新任务状态为失败
         update_task(task_id, status='error', error=str(e))
+
+# ==================== 全局线程池 ====================
+if 'executor' not in st.session_state:
+    st.session_state.executor = ThreadPoolExecutor(max_workers=3)
 
 # ==================== 客户端 ====================
 @st.cache_resource
 def init_client(api_key: str, region: str):
     try:
         return QwenImg(api_key=api_key, region=region)
-    except Exception as e:
-        st.error(f"初始化失败: {str(e)}")
+    except:
         return None
 
 # ==================== UI ====================
@@ -172,12 +178,13 @@ with st.sidebar:
     st.divider()
 
     # 统计信息
-    st.header("📊 统计")
-    total = len(st.session_state.tasks)
-    running = len([t for t in st.session_state.tasks if t['status'] == 'running'])
-    completed = len([t for t in st.session_state.tasks if t['status'] == 'completed'])
-    errors = len([t for t in st.session_state.tasks if t['status'] == 'error'])
+    all_tasks = load_tasks()
+    total = len(all_tasks)
+    running = len([t for t in all_tasks if t['status'] == 'running'])
+    completed = len([t for t in all_tasks if t['status'] == 'completed'])
+    errors = len([t for t in all_tasks if t['status'] == 'error'])
 
+    st.header("📊 统计")
     col1, col2 = st.columns(2)
     with col1:
         st.metric("总任务", total)
@@ -187,20 +194,19 @@ with st.sidebar:
         st.metric("失败", errors)
 
     if running > 0:
-        st.info(f"⏳ 正在执行 {running} 个任务...")
+        st.info(f"⏳ {running} 个任务执行中...")
 
-    if st.button("🗑️ 清空所有任务", use_container_width=True):
-        st.session_state.tasks = []
+    if st.button("🗑️ 清空所有", use_container_width=True):
         save_tasks([])
+        # 删除所有图片文件
+        for img_file in DATA_DIR.glob("*.png"):
+            img_file.unlink()
         st.rerun()
 
     st.divider()
-    st.caption("[GitHub](https://github.com/cclank/qwenimg) | by 岚叔")
+    st.caption("[GitHub](https://github.com/cclank/qwenimg)")
 
-# 初始化客户端
-client = init_client(api_key, region) if api_key else None
-
-if not client:
+if not api_key:
     st.warning("⚠️ 请在侧边栏输入 API Key")
     st.stop()
 
@@ -211,33 +217,24 @@ tab1, tab2, tab3 = st.tabs(["📝 文生图", "🎬 图生视频", "🎥 文生�
 
 # ==================== 文生图 ====================
 with tab1:
-    st.header("文生图 (Text-to-Image)")
+    st.header("文生图")
 
     with st.form("t2i_form"):
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            prompt = st.text_area(
-                "提示词",
-                height=120,
-                placeholder="一只可爱的橘猫坐在窗台上，阳光洒在它身上...",
-            )
-            negative_prompt = st.text_input(
-                "负面提示词（可选）",
-                placeholder="模糊、粗糙、色彩暗淡...",
-            )
+            prompt = st.text_area("提示词", height=120, placeholder="一只可爱的橘猫...")
+            negative_prompt = st.text_input("负面提示词（可选）", placeholder="模糊、粗糙...")
 
         with col2:
             model = st.selectbox("模型", ["wan2.5-t2i-preview", "wanx-v1"])
             size = st.selectbox("尺寸", ["1024*1024", "1280*720", "720*1280"])
-            n = st.slider("生成数量", 1, 4, 1)
+            n = st.slider("数量", 1, 4, 1)
             seed = st.number_input("随机种子（0=随机）", min_value=0, value=0)
             prompt_extend = st.checkbox("自动扩展提示词", value=True)
             watermark = st.checkbox("添加水印", value=False)
 
-        submitted = st.form_submit_button("🎨 生成图片", use_container_width=True)
-
-        if submitted:
+        if st.form_submit_button("🎨 生成", use_container_width=True):
             if not prompt:
                 st.warning("请输入提示词")
             else:
@@ -255,28 +252,23 @@ with tab1:
                     params['seed'] = seed
 
                 task_id = create_task('t2i', params)
-                st.session_state.executor.submit(run_task, task_id, client, 't2i', params)
-                st.success(f"✅ 任务已提交：{task_id}")
-                # 立即刷新以显示任务
+                st.session_state.executor.submit(run_task, task_id, api_key, region, 't2i', params)
+                st.success(f"✅ 任务已提交")
                 st.rerun()
 
     st.divider()
     st.subheader("任务列表")
 
-    # 显示任务列表
     tasks = get_tasks_by_type('t2i')
-
     if not tasks:
-        st.info("暂无任务，提交任务后会显示在这里")
+        st.info("暂无任务")
     else:
         for task in tasks:
             with st.container():
-                col1, col2, col3 = st.columns([3, 2, 1])
-
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.markdown(f"**{task['id']}**")
-                    st.caption(f"创建时间: {task['created_at']}")
-
+                    st.caption(task['created_at'])
                 with col2:
                     if task['status'] == 'running':
                         st.warning("⏳ 运行中")
@@ -285,36 +277,28 @@ with tab1:
                     elif task['status'] == 'completed':
                         st.success("✅ 完成")
 
-                with col3:
-                    with st.expander("参数"):
-                        st.caption(f"提示词: {task['params']['prompt'][:30]}...")
-                        st.caption(f"模型: {task['params']['model']}")
-                        st.caption(f"尺寸: {task['params']['size']}")
-
-                # 显示结果
                 if task['status'] == 'error':
                     st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    images = task['result']['images']
-                    cols = st.columns(min(len(images), 4))
-                    for i, img in enumerate(images):
-                        with cols[i % 4]:
-                            st.image(img, use_container_width=True)
-                            buf = BytesIO()
-                            img.save(buf, format="PNG")
-                            st.download_button(
-                                "📥 下载",
-                                buf.getvalue(),
-                                f"{task['id']}_{i+1}.png",
-                                "image/png",
-                                key=f"dl_{task['id']}_{i}"
-                            )
-
+                    image_paths = task['result']['image_paths']
+                    cols = st.columns(min(len(image_paths), 4))
+                    for i, img_path in enumerate(image_paths):
+                        if Path(img_path).exists():
+                            with cols[i % 4]:
+                                st.image(img_path, use_container_width=True)
+                                with open(img_path, 'rb') as f:
+                                    st.download_button(
+                                        "📥",
+                                        f.read(),
+                                        f"{task['id']}_{i+1}.png",
+                                        "image/png",
+                                        key=f"dl_{task['id']}_{i}"
+                                    )
                 st.divider()
 
 # ==================== 图生视频 ====================
 with tab2:
-    st.header("图生视频 (Image-to-Video)")
+    st.header("图生视频")
 
     with st.form("i2v_form"):
         col1, col2 = st.columns([2, 1])
@@ -323,31 +307,21 @@ with tab2:
             uploaded = st.file_uploader("上传图片", type=["png", "jpg", "jpeg"])
             if uploaded:
                 st.image(uploaded, caption="预览", use_container_width=True)
-
-            prompt = st.text_area(
-                "提示词（可选）",
-                height=100,
-                placeholder="描述视频中的动作和变化...",
-            )
-            negative_prompt = st.text_input(
-                "负面提示词（可选）",
-                placeholder="模糊、抖动、失真...",
-            )
+            prompt = st.text_area("提示词（可选）", height=100)
+            negative_prompt = st.text_input("负面提示词（可选）")
 
         with col2:
             model = st.selectbox("模型", ["wan2.5-i2v-preview"])
             resolution = st.selectbox("分辨率", ["1080P", "720P", "480P"])
             duration = st.selectbox("时长", [10, 5])
-            seed = st.number_input("随机种子（0=随机）", min_value=0, value=0, key="i2v_seed")
-            watermark = st.checkbox("添加水印", value=False, key="i2v_watermark")
+            seed = st.number_input("随机种子", min_value=0, value=0, key="i2v_seed")
+            watermark = st.checkbox("水印", value=False, key="i2v_wm")
 
-        submitted = st.form_submit_button("🎬 生成视频", use_container_width=True)
-
-        if submitted:
+        if st.form_submit_button("🎬 生成", use_container_width=True):
             if not uploaded:
                 st.warning("请上传图片")
             else:
-                temp_path = DATA_DIR / f"temp_i2v_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                temp_path = DATA_DIR / f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
                 with open(temp_path, "wb") as f:
                     f.write(uploaded.getbuffer())
 
@@ -364,27 +338,23 @@ with tab2:
                     params['seed'] = seed
 
                 task_id = create_task('i2v', params)
-                st.session_state.executor.submit(run_task, task_id, client, 'i2v', params)
-                st.success(f"✅ 任务已提交：{task_id}")
-                # 立即刷新以显示任务
+                st.session_state.executor.submit(run_task, task_id, api_key, region, 'i2v', params)
+                st.success("✅ 任务已提交")
                 st.rerun()
 
     st.divider()
     st.subheader("任务列表")
 
     tasks = get_tasks_by_type('i2v')
-
     if not tasks:
-        st.info("暂无任务，提交任务后会显示在这里")
+        st.info("暂无任务")
     else:
         for task in tasks:
             with st.container():
-                col1, col2, col3 = st.columns([3, 2, 1])
-
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.markdown(f"**{task['id']}**")
-                    st.caption(f"创建时间: {task['created_at']}")
-
+                    st.caption(task['created_at'])
                 with col2:
                     if task['status'] == 'running':
                         st.warning("⏳ 运行中")
@@ -393,48 +363,32 @@ with tab2:
                     elif task['status'] == 'completed':
                         st.success("✅ 完成")
 
-                with col3:
-                    with st.expander("参数"):
-                        st.caption(f"分辨率: {task['params']['resolution']}")
-                        st.caption(f"时长: {task['params']['duration']}秒")
-
                 if task['status'] == 'error':
                     st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    url = task['result']['url']
-                    st.video(url)
-                    st.caption(f"[视频链接]({url})")
-
+                    st.video(task['result']['url'])
+                    st.caption(f"[下载]({task['result']['url']})")
                 st.divider()
 
 # ==================== 文生视频 ====================
 with tab3:
-    st.header("文生视频 (Text-to-Video)")
+    st.header("文生视频")
 
     with st.form("t2v_form"):
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            prompt = st.text_area(
-                "提示词",
-                height=120,
-                placeholder="一只柴犬在草地上奔跑，阳光明媚...",
-            )
-            negative_prompt = st.text_input(
-                "负面提示词（可选）",
-                placeholder="模糊、静止、低质量...",
-            )
+            prompt = st.text_area("提示词", height=120, placeholder="一只柴犬...")
+            negative_prompt = st.text_input("负面提示词（可选）")
 
         with col2:
             model = st.selectbox("模型", ["wan2.5-t2v-preview"])
             resolution = st.selectbox("分辨率", ["1080P", "720P", "480P"], key="t2v_res")
             duration = st.selectbox("时长", [10, 5], key="t2v_dur")
-            seed = st.number_input("随机种子（0=随机）", min_value=0, value=0, key="t2v_seed")
-            watermark = st.checkbox("添加水印", value=False, key="t2v_watermark")
+            seed = st.number_input("随机种子", min_value=0, value=0, key="t2v_seed")
+            watermark = st.checkbox("水印", value=False, key="t2v_wm")
 
-        submitted = st.form_submit_button("🎥 生成视频", use_container_width=True)
-
-        if submitted:
+        if st.form_submit_button("🎥 生成", use_container_width=True):
             if not prompt:
                 st.warning("请输入提示词")
             else:
@@ -450,27 +404,23 @@ with tab3:
                     params['seed'] = seed
 
                 task_id = create_task('t2v', params)
-                st.session_state.executor.submit(run_task, task_id, client, 't2v', params)
-                st.success(f"✅ 任务已提交：{task_id}")
-                # 立即刷新以显示任务
+                st.session_state.executor.submit(run_task, task_id, api_key, region, 't2v', params)
+                st.success("✅ 任务已提交")
                 st.rerun()
 
     st.divider()
     st.subheader("任务列表")
 
     tasks = get_tasks_by_type('t2v')
-
     if not tasks:
-        st.info("暂无任务，提交任务后会显示在这里")
+        st.info("暂无任务")
     else:
         for task in tasks:
             with st.container():
-                col1, col2, col3 = st.columns([3, 2, 1])
-
+                col1, col2 = st.columns([4, 1])
                 with col1:
                     st.markdown(f"**{task['id']}**")
-                    st.caption(f"创建时间: {task['created_at']}")
-
+                    st.caption(task['created_at'])
                 with col2:
                     if task['status'] == 'running':
                         st.warning("⏳ 运行中")
@@ -479,23 +429,14 @@ with tab3:
                     elif task['status'] == 'completed':
                         st.success("✅ 完成")
 
-                with col3:
-                    with st.expander("参数"):
-                        st.caption(f"提示词: {task['params']['prompt'][:30]}...")
-                        st.caption(f"分辨率: {task['params']['resolution']}")
-                        st.caption(f"时长: {task['params']['duration']}秒")
-
                 if task['status'] == 'error':
                     st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    url = task['result']['url']
-                    st.video(url)
-                    st.caption(f"[视频链接]({url})")
-
+                    st.video(task['result']['url'])
+                    st.caption(f"[下载]({task['result']['url']})")
                 st.divider()
 
 # ==================== 自动刷新 ====================
-# 如果有运行中的任务，自动刷新
 if has_running_tasks():
-    time.sleep(2)  # 等待 2 秒再刷新，避免过于频繁
+    time.sleep(2)
     st.rerun()

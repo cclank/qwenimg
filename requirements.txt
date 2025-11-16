@@ -12,3 +12,4 @@ python-dotenv>=0.19.0
 # Optional dependencies for Web UI
 # Uncomment to use app.py
 # streamlit>=1.28.0
+# filelock>=3.0.0
