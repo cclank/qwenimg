@@ -1,12 +1,12 @@
 """
-QwenImg Web UI - 简洁高效版
+QwenImg Web UI - 简洁可用版
 
 核心特性：
-✅ 完整功能 - 所有配置项全保留
-✅ 多任务展示 - 每个 tab 显示所有任务结果
-✅ 并发创作 - 支持同时运行多个任务
-✅ 持久化 - 支持页面刷新
-✅ 简洁代码 - 统一架构，避免重复
+✅ 所有配置项全保留
+✅ 多任务并发执行
+✅ 结果自动显示，无需手动刷新
+✅ 页面不闪烁，体验流畅
+✅ 支持页面刷新
 """
 
 import streamlit as st
@@ -18,7 +18,7 @@ from io import BytesIO
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, List
-import time
+import threading
 
 # 添加项目路径
 project_root = Path(__file__).parent
@@ -38,6 +38,19 @@ st.set_page_config(
     layout="wide"
 )
 
+# 自定义 CSS - 禁用页面变浅效果
+st.markdown("""
+<style>
+    /* 禁用 Streamlit 的 stale 元素变浅效果 */
+    .stale {
+        opacity: 1.0 !important;
+    }
+    .element-container {
+        opacity: 1.0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ==================== 持久化 ====================
 def load_tasks():
     """加载任务列表"""
@@ -51,7 +64,6 @@ def load_tasks():
 
 def save_tasks(tasks: List[Dict]):
     """保存任务列表"""
-    # 只保留最近 50 个任务
     if len(tasks) > 50:
         tasks = tasks[-50:]
     with open(TASKS_FILE, 'w', encoding='utf-8') as f:
@@ -63,6 +75,9 @@ if 'executor' not in st.session_state:
 
 if 'tasks' not in st.session_state:
     st.session_state.tasks = load_tasks()
+
+if 'task_lock' not in st.session_state:
+    st.session_state.task_lock = threading.Lock()
 
 # ==================== 任务管理 ====================
 def create_task(task_type: str, params: Dict[str, Any]) -> str:
@@ -77,22 +92,30 @@ def create_task(task_type: str, params: Dict[str, Any]) -> str:
         'error': None,
         'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-    st.session_state.tasks.append(task)
-    save_tasks(st.session_state.tasks)
+    with st.session_state.task_lock:
+        st.session_state.tasks.append(task)
+        save_tasks(st.session_state.tasks)
     return task_id
 
 def update_task(task_id: str, **kwargs):
     """更新任务"""
-    for task in st.session_state.tasks:
-        if task['id'] == task_id:
-            task.update(kwargs)
-            save_tasks(st.session_state.tasks)
-            break
+    with st.session_state.task_lock:
+        for task in st.session_state.tasks:
+            if task['id'] == task_id:
+                task.update(kwargs)
+                save_tasks(st.session_state.tasks)
+                break
 
 def get_tasks_by_type(task_type: str) -> List[Dict]:
     """获取指定类型的任务（倒序）"""
-    tasks = [t for t in st.session_state.tasks if t['type'] == task_type]
+    with st.session_state.task_lock:
+        tasks = [t for t in st.session_state.tasks if t['type'] == task_type]
     return list(reversed(tasks))
+
+def has_running_tasks() -> bool:
+    """检查是否有运行中的任务"""
+    with st.session_state.task_lock:
+        return any(t['status'] == 'running' for t in st.session_state.tasks)
 
 # ==================== 任务执行 ====================
 def run_task(task_id: str, client: QwenImg, task_type: str, params: Dict[str, Any]):
@@ -126,7 +149,20 @@ def init_client(api_key: str, region: str):
 
 # ==================== UI ====================
 st.title("🎨 QwenImg")
-st.caption("简洁高效的图片视频生成工具")
+st.caption("简洁可用的图片视频生成工具")
+
+# 顶部刷新按钮
+col_refresh, col_stats = st.columns([1, 4])
+with col_refresh:
+    if st.button("🔄 刷新结果", use_container_width=True):
+        st.rerun()
+
+with col_stats:
+    running_count = len([t for t in st.session_state.tasks if t['status'] == 'running'])
+    if running_count > 0:
+        st.info(f"⏳ 正在执行 {running_count} 个任务，点击左侧刷新按钮查看最新结果")
+
+st.divider()
 
 # 侧边栏
 with st.sidebar:
@@ -221,46 +257,43 @@ with tab1:
                 task_id = create_task('t2i', params)
                 st.session_state.executor.submit(run_task, task_id, client, 't2i', params)
                 st.success(f"✅ 任务已提交：{task_id}")
-                time.sleep(1)
-                st.rerun()
 
     st.divider()
+    st.subheader("任务列表")
 
     # 显示任务列表
     tasks = get_tasks_by_type('t2i')
 
     if not tasks:
-        st.info("暂无任务")
+        st.info("暂无任务，提交任务后会显示在这里")
     else:
-        # 检查是否有运行中的任务
-        running_tasks = [t for t in tasks if t['status'] == 'running']
-        if running_tasks:
-            st.info(f"🔄 正在执行 {len(running_tasks)} 个任务...")
-            time.sleep(1)
-            st.rerun()
-
-        # 显示所有任务
         for task in tasks:
             with st.container():
-                st.markdown(f"**任务 ID**: `{task['id']}`")
-                st.caption(f"创建时间: {task['created_at']}")
+                col1, col2, col3 = st.columns([3, 2, 1])
 
-                # 显示参数
-                with st.expander("查看参数"):
-                    st.write(f"**提示词**: {task['params']['prompt'][:100]}...")
-                    st.write(f"**模型**: {task['params']['model']}")
-                    st.write(f"**尺寸**: {task['params']['size']}")
-                    st.write(f"**数量**: {task['params']['n']}")
+                with col1:
+                    st.markdown(f"**{task['id']}**")
+                    st.caption(f"创建时间: {task['created_at']}")
 
-                # 显示状态和结果
-                if task['status'] == 'running':
-                    st.warning("⏳ 运行中...")
-                elif task['status'] == 'error':
-                    st.error(f"❌ 失败: {task['error']}")
+                with col2:
+                    if task['status'] == 'running':
+                        st.warning("⏳ 运行中")
+                    elif task['status'] == 'error':
+                        st.error("❌ 失败")
+                    elif task['status'] == 'completed':
+                        st.success("✅ 完成")
+
+                with col3:
+                    with st.expander("参数"):
+                        st.caption(f"提示词: {task['params']['prompt'][:30]}...")
+                        st.caption(f"模型: {task['params']['model']}")
+                        st.caption(f"尺寸: {task['params']['size']}")
+
+                # 显示结果
+                if task['status'] == 'error':
+                    st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    st.success("✅ 完成")
                     images = task['result']['images']
-
                     cols = st.columns(min(len(images), 4))
                     for i, img in enumerate(images):
                         with cols[i % 4]:
@@ -268,7 +301,7 @@ with tab1:
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             st.download_button(
-                                f"📥 下载",
+                                "📥 下载",
                                 buf.getvalue(),
                                 f"{task['id']}_{i+1}.png",
                                 "image/png",
@@ -312,7 +345,6 @@ with tab2:
             if not uploaded:
                 st.warning("请上传图片")
             else:
-                # 保存临时图片
                 temp_path = DATA_DIR / f"temp_i2v_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
                 with open(temp_path, "wb") as f:
                     f.write(uploaded.getbuffer())
@@ -332,41 +364,39 @@ with tab2:
                 task_id = create_task('i2v', params)
                 st.session_state.executor.submit(run_task, task_id, client, 'i2v', params)
                 st.success(f"✅ 任务已提交：{task_id}")
-                time.sleep(1)
-                st.rerun()
 
     st.divider()
+    st.subheader("任务列表")
 
-    # 显示任务列表
     tasks = get_tasks_by_type('i2v')
 
     if not tasks:
-        st.info("暂无任务")
+        st.info("暂无任务，提交任务后会显示在这里")
     else:
-        # 检查运行中的任务
-        running_tasks = [t for t in tasks if t['status'] == 'running']
-        if running_tasks:
-            st.info(f"🔄 正在生成 {len(running_tasks)} 个视频（约 {duration * 10} 秒）...")
-            time.sleep(1)
-            st.rerun()
-
-        # 显示所有任务
         for task in tasks:
             with st.container():
-                st.markdown(f"**任务 ID**: `{task['id']}`")
-                st.caption(f"创建时间: {task['created_at']}")
+                col1, col2, col3 = st.columns([3, 2, 1])
 
-                with st.expander("查看参数"):
-                    st.write(f"**提示词**: {task['params'].get('prompt', 'N/A')}")
-                    st.write(f"**分辨率**: {task['params']['resolution']}")
-                    st.write(f"**时长**: {task['params']['duration']} 秒")
+                with col1:
+                    st.markdown(f"**{task['id']}**")
+                    st.caption(f"创建时间: {task['created_at']}")
 
-                if task['status'] == 'running':
-                    st.warning("⏳ 运行中...")
-                elif task['status'] == 'error':
-                    st.error(f"❌ 失败: {task['error']}")
+                with col2:
+                    if task['status'] == 'running':
+                        st.warning("⏳ 运行中")
+                    elif task['status'] == 'error':
+                        st.error("❌ 失败")
+                    elif task['status'] == 'completed':
+                        st.success("✅ 完成")
+
+                with col3:
+                    with st.expander("参数"):
+                        st.caption(f"分辨率: {task['params']['resolution']}")
+                        st.caption(f"时长: {task['params']['duration']}秒")
+
+                if task['status'] == 'error':
+                    st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    st.success("✅ 完成")
                     url = task['result']['url']
                     st.video(url)
                     st.caption(f"[视频链接]({url})")
@@ -418,43 +448,52 @@ with tab3:
                 task_id = create_task('t2v', params)
                 st.session_state.executor.submit(run_task, task_id, client, 't2v', params)
                 st.success(f"✅ 任务已提交：{task_id}")
-                time.sleep(1)
-                st.rerun()
 
     st.divider()
+    st.subheader("任务列表")
 
-    # 显示任务列表
     tasks = get_tasks_by_type('t2v')
 
     if not tasks:
-        st.info("暂无任务")
+        st.info("暂无任务，提交任务后会显示在这里")
     else:
-        # 检查运行中的任务
-        running_tasks = [t for t in tasks if t['status'] == 'running']
-        if running_tasks:
-            st.info(f"🔄 正在生成 {len(running_tasks)} 个视频（约 {duration * 10} 秒）...")
-            time.sleep(1)
-            st.rerun()
-
-        # 显示所有任务
         for task in tasks:
             with st.container():
-                st.markdown(f"**任务 ID**: `{task['id']}`")
-                st.caption(f"创建时间: {task['created_at']}")
+                col1, col2, col3 = st.columns([3, 2, 1])
 
-                with st.expander("查看参数"):
-                    st.write(f"**提示词**: {task['params']['prompt'][:100]}...")
-                    st.write(f"**分辨率**: {task['params']['resolution']}")
-                    st.write(f"**时长**: {task['params']['duration']} 秒")
+                with col1:
+                    st.markdown(f"**{task['id']}**")
+                    st.caption(f"创建时间: {task['created_at']}")
 
-                if task['status'] == 'running':
-                    st.warning("⏳ 运行中...")
-                elif task['status'] == 'error':
-                    st.error(f"❌ 失败: {task['error']}")
+                with col2:
+                    if task['status'] == 'running':
+                        st.warning("⏳ 运行中")
+                    elif task['status'] == 'error':
+                        st.error("❌ 失败")
+                    elif task['status'] == 'completed':
+                        st.success("✅ 完成")
+
+                with col3:
+                    with st.expander("参数"):
+                        st.caption(f"提示词: {task['params']['prompt'][:30]}...")
+                        st.caption(f"分辨率: {task['params']['resolution']}")
+                        st.caption(f"时长: {task['params']['duration']}秒")
+
+                if task['status'] == 'error':
+                    st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    st.success("✅ 完成")
                     url = task['result']['url']
                     st.video(url)
                     st.caption(f"[视频链接]({url})")
 
                 st.divider()
+
+# 自动刷新（仅当有运行中任务时）
+if has_running_tasks():
+    st.markdown("""
+    <script>
+        setTimeout(function() {
+            window.parent.location.reload();
+        }, 3000);
+    </script>
+    """, unsafe_allow_html=True)
