@@ -16,7 +16,7 @@ from pathlib import Path
 from io import BytesIO
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import time
 import filelock
 
@@ -48,6 +48,10 @@ st.markdown("""
     * { transition: none !important; }
 </style>
 """, unsafe_allow_html=True)
+
+# ==================== 初始化状态 ====================
+if 'status_filter' not in st.session_state:
+    st.session_state.status_filter = None  # None, 'running', 'completed', 'error'
 
 # ==================== 文件操作（线程安全）====================
 def load_tasks() -> List[Dict]:
@@ -102,10 +106,15 @@ def update_task(task_id: str, **kwargs):
             break
     save_tasks(tasks)
 
-def get_tasks_by_type(task_type: str) -> List[Dict]:
-    """获取指定类型的任务"""
+def get_tasks_by_type(task_type: str, status_filter: Optional[str] = None) -> List[Dict]:
+    """获取指定类型的任务，支持状态筛选"""
     tasks = load_tasks()
     filtered = [t for t in tasks if t['type'] == task_type]
+
+    # 应用状态筛选
+    if status_filter:
+        filtered = [t for t in filtered if t['status'] == status_filter]
+
     return list(reversed(filtered))  # 最新的在前
 
 def has_running_tasks() -> bool:
@@ -185,16 +194,37 @@ with st.sidebar:
     errors = len([t for t in all_tasks if t['status'] == 'error'])
 
     st.header("📊 统计")
+
+    # 可点击的统计指标
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("总任务", total)
-        st.metric("运行中", running)
+        if st.button(f"📋 总任务\n{total}", use_container_width=True, key="filter_all"):
+            st.session_state.status_filter = None
+            st.rerun()
+        if st.button(f"⏳ 运行中\n{running}", use_container_width=True, key="filter_running",
+                     type="primary" if st.session_state.status_filter == 'running' else "secondary"):
+            st.session_state.status_filter = 'running'
+            st.rerun()
     with col2:
-        st.metric("已完成", completed)
-        st.metric("失败", errors)
+        if st.button(f"✅ 已完成\n{completed}", use_container_width=True, key="filter_completed",
+                     type="primary" if st.session_state.status_filter == 'completed' else "secondary"):
+            st.session_state.status_filter = 'completed'
+            st.rerun()
+        if st.button(f"❌ 失败\n{errors}", use_container_width=True, key="filter_error",
+                     type="primary" if st.session_state.status_filter == 'error' else "secondary"):
+            st.session_state.status_filter = 'error'
+            st.rerun()
 
-    if running > 0:
-        st.info(f"⏳ {running} 个任务执行中...")
+    # 显示当前筛选状态
+    if st.session_state.status_filter:
+        filter_text = {
+            'running': '⏳ 运行中',
+            'completed': '✅ 已完成',
+            'error': '❌ 失败'
+        }
+        st.info(f"当前筛选: {filter_text[st.session_state.status_filter]}")
+
+    st.divider()
 
     if st.button("🗑️ 清空所有", use_container_width=True):
         save_tasks([])
@@ -259,9 +289,9 @@ with tab1:
     st.divider()
     st.subheader("任务列表")
 
-    tasks = get_tasks_by_type('t2i')
+    tasks = get_tasks_by_type('t2i', st.session_state.status_filter)
     if not tasks:
-        st.info("暂无任务")
+        st.info("暂无任务" if not st.session_state.status_filter else f"暂无{st.session_state.status_filter}状态的任务")
     else:
         for task in tasks:
             with st.container():
@@ -305,10 +335,15 @@ with tab2:
 
         with col1:
             uploaded = st.file_uploader("上传图片", type=["png", "jpg", "jpeg"])
+
+            # 上传后立即显示预览
             if uploaded:
-                st.image(uploaded, caption="预览", use_container_width=True)
-            prompt = st.text_area("提示词（可选）", height=100)
-            negative_prompt = st.text_input("负面提示词（可选）")
+                st.markdown("### 📸 图片预览")
+                st.image(uploaded, use_container_width=True)
+                st.success("✅ 图片已上传")
+
+            prompt = st.text_area("提示词（可选）", height=100, placeholder="描述视频动作...")
+            negative_prompt = st.text_input("负面提示词（可选）", placeholder="模糊、抖动...")
 
         with col2:
             model = st.selectbox("模型", ["wan2.5-i2v-preview"])
@@ -345,9 +380,9 @@ with tab2:
     st.divider()
     st.subheader("任务列表")
 
-    tasks = get_tasks_by_type('i2v')
+    tasks = get_tasks_by_type('i2v', st.session_state.status_filter)
     if not tasks:
-        st.info("暂无任务")
+        st.info("暂无任务" if not st.session_state.status_filter else f"暂无{st.session_state.status_filter}状态的任务")
     else:
         for task in tasks:
             with st.container():
@@ -379,7 +414,7 @@ with tab3:
 
         with col1:
             prompt = st.text_area("提示词", height=120, placeholder="一只柴犬...")
-            negative_prompt = st.text_input("负面提示词（可选）")
+            negative_prompt = st.text_input("负面提示词（可选）", placeholder="模糊、静止...")
 
         with col2:
             model = st.selectbox("模型", ["wan2.5-t2v-preview"])
@@ -411,9 +446,9 @@ with tab3:
     st.divider()
     st.subheader("任务列表")
 
-    tasks = get_tasks_by_type('t2v')
+    tasks = get_tasks_by_type('t2v', st.session_state.status_filter)
     if not tasks:
-        st.info("暂无任务")
+        st.info("暂无任务" if not st.session_state.status_filter else f"暂无{st.session_state.status_filter}状态的任务")
     else:
         for task in tasks:
             with st.container():
