@@ -1,46 +1,97 @@
 # QwenImg 快速开始指南
 
-## 🚀 5分钟快速上手
+## 🚀 3步快速上手
 
 ### 前置要求
 
-- Python 3.8+
-- Node.js 16+
-- DashScope API Key（[获取地址](https://dashscope.console.aliyun.com/apiKey)）
+- ✅ Python 3.8+
+- ✅ Node.js 16+
+- ✅ DashScope API Key（[点击获取](https://dashscope.console.aliyun.com/apiKey)）
 
-### 一键启动（推荐）
+---
+
+## 方式一：一键启动（最快）
 
 ```bash
 # 1. 克隆项目
 git clone https://github.com/cclank/qwenimg.git
 cd qwenimg
 
-# 2. 配置环境变量（设置你的API Key）
-export DASHSCOPE_API_KEY="your_api_key_here"
+# 2. 配置API Key（必须）
+export DASHSCOPE_API_KEY="sk-your-api-key-here"
 
-# 3. 启动开发服务器
+# 3. 一键启动（自动安装依赖）
+chmod +x start_dev.sh
 ./start_dev.sh
 ```
 
-脚本会自动：
-- ✅ 安装后端依赖
-- ✅ 安装前端依赖
-- ✅ 启动后端服务（8000端口）
-- ✅ 启动前端服务（3000端口）
+**启动脚本会自动：**
+- 🔍 检查Python和Node.js
+- 📦 安装后端Python依赖
+- 📦 安装前端npm依赖
+- ✅ 验证依赖安装成功
+- 🚀 启动后端服务（8000端口）
+- 🚀 启动前端服务（3000端口）
+- ✅ 验证服务启动成功
+
+**如果启动失败：**
+脚本会自动显示错误日志和解决方案！
 
 ### 访问应用
 
-打开浏览器访问：**http://localhost:3000**
-
-- 前端页面：http://localhost:3000
-- API文档：http://localhost:8000/api/docs
-- ReDoc文档：http://localhost:8000/api/redoc
+✅ **前端页面**：http://localhost:3000
+✅ **API文档**：http://localhost:8000/api/docs
+✅ **健康检查**：http://localhost:8000/health
 
 ### 停止服务
 
 ```bash
 ./stop_dev.sh
 ```
+
+---
+
+## 方式二：分步安装（推荐新手）
+
+### Step 1: 安装依赖
+
+```bash
+# 运行安装脚本
+chmod +x install.sh
+./install.sh
+```
+
+安装脚本会：
+- ✅ 检查Python和Node.js版本
+- ✅ 安装所有后端依赖
+- ✅ 安装所有前端依赖
+- ✅ 创建配置文件模板
+
+### Step 2: 配置API Key
+
+**方式A：环境变量（推荐）**
+```bash
+export DASHSCOPE_API_KEY="sk-your-api-key-here"
+```
+
+**方式B：配置文件**
+```bash
+# 编辑backend/.env文件
+nano backend/.env
+
+# 修改这一行：
+DASHSCOPE_API_KEY=sk-your-api-key-here
+```
+
+### Step 3: 启动服务
+
+```bash
+./start_dev.sh
+```
+
+---
+
+## 方式三：手动启动（完全控制）
 
 ---
 
