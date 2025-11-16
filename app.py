@@ -311,19 +311,23 @@ with tab1:
                     st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
                     image_paths = task['result']['image_paths']
-                    cols = st.columns(min(len(image_paths), 4))
-                    for i, img_path in enumerate(image_paths):
-                        if Path(img_path).exists():
-                            with cols[i % 4]:
-                                st.image(img_path, use_container_width=True)
-                                with open(img_path, 'rb') as f:
-                                    st.download_button(
-                                        "📥",
-                                        f.read(),
-                                        f"{task['id']}_{i+1}.png",
-                                        "image/png",
-                                        key=f"dl_{task['id']}_{i}"
-                                    )
+
+                    # 使用 3/4 屏幕宽度显示图片
+                    _, col_center, _ = st.columns([0.125, 0.75, 0.125])
+                    with col_center:
+                        cols = st.columns(min(len(image_paths), 4))
+                        for i, img_path in enumerate(image_paths):
+                            if Path(img_path).exists():
+                                with cols[i % 4]:
+                                    st.image(img_path, use_container_width=True)
+                                    with open(img_path, 'rb') as f:
+                                        st.download_button(
+                                            "📥",
+                                            f.read(),
+                                            f"{task['id']}_{i+1}.png",
+                                            "image/png",
+                                            key=f"dl_{task['id']}_{i}"
+                                        )
                 st.divider()
 
 # ==================== 图生视频 ====================
@@ -336,10 +340,12 @@ with tab2:
         with col1:
             uploaded = st.file_uploader("上传图片", type=["png", "jpg", "jpeg"])
 
-            # 上传后立即显示预览
+            # 上传后立即显示预览（3/4 宽度）
             if uploaded:
                 st.markdown("### 📸 图片预览")
-                st.image(uploaded, use_container_width=True)
+                _, col_preview, _ = st.columns([0.125, 0.75, 0.125])
+                with col_preview:
+                    st.image(uploaded, use_container_width=True)
                 st.success("✅ 图片已上传")
 
             prompt = st.text_area("提示词（可选）", height=100, placeholder="描述视频动作...")
@@ -401,7 +407,10 @@ with tab2:
                 if task['status'] == 'error':
                     st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    st.video(task['result']['url'])
+                    # 使用 3/4 屏幕宽度显示视频
+                    _, col_center, _ = st.columns([0.125, 0.75, 0.125])
+                    with col_center:
+                        st.video(task['result']['url'])
                     st.caption(f"[下载]({task['result']['url']})")
                 st.divider()
 
@@ -467,7 +476,10 @@ with tab3:
                 if task['status'] == 'error':
                     st.error(task['error'])
                 elif task['status'] == 'completed' and task['result']:
-                    st.video(task['result']['url'])
+                    # 使用 3/4 屏幕宽度显示视频
+                    _, col_center, _ = st.columns([0.125, 0.75, 0.125])
+                    with col_center:
+                        st.video(task['result']['url'])
                     st.caption(f"[下载]({task['result']['url']})")
                 st.divider()
 
