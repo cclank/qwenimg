@@ -9,6 +9,7 @@ QwenImg Web UI - 简洁可用版
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import sys
 import json
@@ -212,8 +213,20 @@ with st.sidebar:
                      disabled=(errors == 0)):
             st.session_state.jump_to_status = 'error'
 
+    # 如果设置了跳转目标，执行 JavaScript 滚动
     if st.session_state.jump_to_status and st.session_state.jump_to_status != 'all':
-        st.info(f"💡 点击后自动跳转到第一个{st.session_state.jump_to_status}状态的任务")
+        target_id = f"task-{st.session_state.jump_to_status}"
+        components.html(f"""
+        <script>
+            setTimeout(function() {{
+                const element = window.parent.document.getElementById('{target_id}');
+                if (element) {{
+                    element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                }}
+            }}, 100);
+        </script>
+        """, height=0)
+        st.session_state.jump_to_status = None
 
     st.divider()
 
@@ -284,23 +297,16 @@ with tab1:
     if not tasks:
         st.info("暂无任务")
     else:
-        # 标记是否已跳转
-        jumped = False
+        # 记录每个状态的第一个任务
+        status_first_seen = set()
 
         for task in tasks:
-            # 为每个状态添加锚点
             status = task['status']
-            if not jumped and st.session_state.jump_to_status == status:
-                # 使用 HTML 锚点标记
-                st.markdown(f'<div id="jump-target"></div>', unsafe_allow_html=True)
-                # 滚动到此位置
-                st.markdown("""
-                <script>
-                    document.getElementById('jump-target').scrollIntoView({behavior: 'smooth'});
-                </script>
-                """, unsafe_allow_html=True)
-                jumped = True
-                st.session_state.jump_to_status = None  # 清除跳转标记
+
+            # 为每个状态的第一个任务添加 id 锚点
+            if status not in status_first_seen:
+                st.markdown(f'<div id="task-{status}"></div>', unsafe_allow_html=True)
+                status_first_seen.add(status)
 
             with st.container():
                 col1, col2 = st.columns([4, 1])
@@ -398,19 +404,16 @@ with tab2:
     if not tasks:
         st.info("暂无任务")
     else:
-        jumped = False
+        # 记录每个状态的第一个任务
+        status_first_seen = set()
 
         for task in tasks:
             status = task['status']
-            if not jumped and st.session_state.jump_to_status == status:
-                st.markdown(f'<div id="jump-target"></div>', unsafe_allow_html=True)
-                st.markdown("""
-                <script>
-                    document.getElementById('jump-target').scrollIntoView({behavior: 'smooth'});
-                </script>
-                """, unsafe_allow_html=True)
-                jumped = True
-                st.session_state.jump_to_status = None
+
+            # 为每个状态的第一个任务添加 id 锚点
+            if status not in status_first_seen:
+                st.markdown(f'<div id="task-{status}"></div>', unsafe_allow_html=True)
+                status_first_seen.add(status)
 
             with st.container():
                 col1, col2 = st.columns([4, 1])
@@ -480,19 +483,16 @@ with tab3:
     if not tasks:
         st.info("暂无任务")
     else:
-        jumped = False
+        # 记录每个状态的第一个任务
+        status_first_seen = set()
 
         for task in tasks:
             status = task['status']
-            if not jumped and st.session_state.jump_to_status == status:
-                st.markdown(f'<div id="jump-target"></div>', unsafe_allow_html=True)
-                st.markdown("""
-                <script>
-                    document.getElementById('jump-target').scrollIntoView({behavior: 'smooth'});
-                </script>
-                """, unsafe_allow_html=True)
-                jumped = True
-                st.session_state.jump_to_status = None
+
+            # 为每个状态的第一个任务添加 id 锚点
+            if status not in status_first_seen:
+                st.markdown(f'<div id="task-{status}"></div>', unsafe_allow_html=True)
+                status_first_seen.add(status)
 
             with st.container():
                 col1, col2 = st.columns([4, 1])
