@@ -4,8 +4,8 @@ QwenImg Web UI - 简洁可用版
 核心特性：
 ✅ 所有配置项全保留
 ✅ 多任务并发执行
-✅ 结果自动显示，无需手动刷新
-✅ 页面不闪烁，体验流畅
+✅ 自动刷新显示结果
+✅ 页面不闪烁
 ✅ 支持页面刷新
 """
 
@@ -19,6 +19,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, List
 import threading
+import time
 
 # 添加项目路径
 project_root = Path(__file__).parent
@@ -47,6 +48,13 @@ st.markdown("""
     }
     .element-container {
         opacity: 1.0 !important;
+    }
+    [data-testid="stale-element-container"] {
+        opacity: 1.0 !important;
+    }
+    /* 禁用所有元素的 opacity 变化 */
+    * {
+        transition: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -151,19 +159,6 @@ def init_client(api_key: str, region: str):
 st.title("🎨 QwenImg")
 st.caption("简洁可用的图片视频生成工具")
 
-# 顶部刷新按钮
-col_refresh, col_stats = st.columns([1, 4])
-with col_refresh:
-    if st.button("🔄 刷新结果", use_container_width=True):
-        st.rerun()
-
-with col_stats:
-    running_count = len([t for t in st.session_state.tasks if t['status'] == 'running'])
-    if running_count > 0:
-        st.info(f"⏳ 正在执行 {running_count} 个任务，点击左侧刷新按钮查看最新结果")
-
-st.divider()
-
 # 侧边栏
 with st.sidebar:
     st.header("⚙️ 配置")
@@ -191,6 +186,9 @@ with st.sidebar:
         st.metric("已完成", completed)
         st.metric("失败", errors)
 
+    if running > 0:
+        st.info(f"⏳ 正在执行 {running} 个任务...")
+
     if st.button("🗑️ 清空所有任务", use_container_width=True):
         st.session_state.tasks = []
         save_tasks([])
@@ -205,6 +203,8 @@ client = init_client(api_key, region) if api_key else None
 if not client:
     st.warning("⚠️ 请在侧边栏输入 API Key")
     st.stop()
+
+st.divider()
 
 # ==================== 主界面 ====================
 tab1, tab2, tab3 = st.tabs(["📝 文生图", "🎬 图生视频", "🎥 文生视频"])
@@ -257,6 +257,8 @@ with tab1:
                 task_id = create_task('t2i', params)
                 st.session_state.executor.submit(run_task, task_id, client, 't2i', params)
                 st.success(f"✅ 任务已提交：{task_id}")
+                # 立即刷新以显示任务
+                st.rerun()
 
     st.divider()
     st.subheader("任务列表")
@@ -364,6 +366,8 @@ with tab2:
                 task_id = create_task('i2v', params)
                 st.session_state.executor.submit(run_task, task_id, client, 'i2v', params)
                 st.success(f"✅ 任务已提交：{task_id}")
+                # 立即刷新以显示任务
+                st.rerun()
 
     st.divider()
     st.subheader("任务列表")
@@ -448,6 +452,8 @@ with tab3:
                 task_id = create_task('t2v', params)
                 st.session_state.executor.submit(run_task, task_id, client, 't2v', params)
                 st.success(f"✅ 任务已提交：{task_id}")
+                # 立即刷新以显示任务
+                st.rerun()
 
     st.divider()
     st.subheader("任务列表")
@@ -488,12 +494,8 @@ with tab3:
 
                 st.divider()
 
-# 自动刷新（仅当有运行中任务时）
+# ==================== 自动刷新 ====================
+# 如果有运行中的任务，自动刷新
 if has_running_tasks():
-    st.markdown("""
-    <script>
-        setTimeout(function() {
-            window.parent.location.reload();
-        }, 3000);
-    </script>
-    """, unsafe_allow_html=True)
+    time.sleep(2)  # 等待 2 秒再刷新，避免过于频繁
+    st.rerun()
