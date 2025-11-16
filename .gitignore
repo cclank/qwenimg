@@ -64,3 +64,6 @@ build/
 
 # Logs
 *.log
+
+# Streamlit cache
+.streamlit_cache/
