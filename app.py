@@ -234,37 +234,65 @@ with tab1:
             if not prompt:
                 st.warning("请输入提示词")
             else:
-                params = {
-                    'prompt': prompt,
-                    'model': model,
-                    'size': size,
-                    'n': n,
-                    'negative_prompt': negative_prompt,
-                    'prompt_extend': prompt_extend,
-                    'watermark': watermark
-                }
-                if seed > 0:
-                    params['seed'] = seed
-
-                task_id = create_task('t2i', params)
-                st.session_state.executor.submit(run_task, task_id, api_key, region, 't2i', params)
-
-                # 等待任务完成
+                # 同步执行，不使用后台线程，直接显示结果
                 status_placeholder = st.empty()
+                result_placeholder = st.empty()
+
                 status_placeholder.info("⏳ 正在生成中，请稍候...")
 
-                max_wait = 60  # 最多等待60秒
-                for i in range(max_wait):
-                    time.sleep(1)
-                    tasks = load_tasks()
-                    current_task = next((t for t in tasks if t['id'] == task_id), None)
-                    if current_task and current_task['status'] != 'running':
-                        break
+                try:
+                    client = QwenImg(api_key=api_key, region=region)
 
-                status_placeholder.empty()
-                st.success("✅ 任务完成！")
-                time.sleep(1)
-                st.rerun()
+                    # 直接调用生成
+                    image_paths = client.text_to_image(
+                        prompt=prompt,
+                        model=model,
+                        size=size,
+                        n=n,
+                        negative_prompt=negative_prompt,
+                        prompt_extend=prompt_extend,
+                        watermark=watermark,
+                        seed=seed if seed > 0 else None,
+                        save=True,
+                        return_pil=False,
+                        output_dir=str(DATA_DIR)
+                    )
+
+                    if not isinstance(image_paths, list):
+                        image_paths = [image_paths]
+
+                    # 保存任务记录
+                    params = {
+                        'prompt': prompt,
+                        'model': model,
+                        'size': size,
+                        'n': n,
+                        'negative_prompt': negative_prompt,
+                        'prompt_extend': prompt_extend,
+                        'watermark': watermark
+                    }
+                    if seed > 0:
+                        params['seed'] = seed
+
+                    task_id = create_task('t2i', params)
+                    update_task(task_id, {
+                        'status': 'completed',
+                        'result': {'image_paths': image_paths}
+                    })
+
+                    status_placeholder.success("✅ 生成成功！")
+
+                    # 直接在页面上显示结果
+                    with result_placeholder.container():
+                        st.markdown("### 🎨 生成结果")
+                        cols = st.columns(min(len(image_paths), 4))
+                        for i, img_path in enumerate(image_paths):
+                            if Path(img_path).exists():
+                                with cols[i % 4]:
+                                    st.image(img_path, use_container_width=True)
+
+                except Exception as e:
+                    status_placeholder.error(f"❌ 生成失败: {str(e)}")
 
     st.divider()
 
@@ -341,41 +369,59 @@ with tab2:
             if not uploaded:
                 st.warning("请上传图片")
             else:
-                temp_path = DATA_DIR / f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                with open(temp_path, "wb") as f:
-                    f.write(uploaded.getbuffer())
-
-                params = {
-                    'image': str(temp_path),
-                    'model': model,
-                    'prompt': prompt,
-                    'negative_prompt': negative_prompt,
-                    'resolution': resolution,
-                    'duration': duration,
-                    'watermark': watermark,
-                }
-                if seed > 0:
-                    params['seed'] = seed
-
-                task_id = create_task('i2v', params)
-                st.session_state.executor.submit(run_task, task_id, api_key, region, 'i2v', params)
-
-                # 等待任务完成
+                # 同步执行，不使用后台线程，直接显示结果
                 status_placeholder = st.empty()
-                status_placeholder.info("⏳ 正在生成中，请稍候...")
+                result_placeholder = st.empty()
 
-                max_wait = 120  # 视频生成最多等待120秒
-                for i in range(max_wait):
-                    time.sleep(1)
-                    tasks = load_tasks()
-                    current_task = next((t for t in tasks if t['id'] == task_id), None)
-                    if current_task and current_task['status'] != 'running':
-                        break
+                status_placeholder.info("⏳ 正在生成中，请稍候（预计需要10-30秒）...")
 
-                status_placeholder.empty()
-                st.success("✅ 任务完成！")
-                time.sleep(1)
-                st.rerun()
+                try:
+                    temp_path = DATA_DIR / f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    with open(temp_path, "wb") as f:
+                        f.write(uploaded.getbuffer())
+
+                    client = QwenImg(api_key=api_key, region=region)
+
+                    # 直接调用生成
+                    video_url = client.image_to_video(
+                        image=str(temp_path),
+                        model=model,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        resolution=resolution,
+                        duration=duration,
+                        watermark=watermark,
+                        seed=seed if seed > 0 else None
+                    )
+
+                    # 保存任务记录
+                    params = {
+                        'image': str(temp_path),
+                        'model': model,
+                        'prompt': prompt,
+                        'negative_prompt': negative_prompt,
+                        'resolution': resolution,
+                        'duration': duration,
+                        'watermark': watermark,
+                    }
+                    if seed > 0:
+                        params['seed'] = seed
+
+                    task_id = create_task('i2v', params)
+                    update_task(task_id, {
+                        'status': 'completed',
+                        'result': {'url': video_url}
+                    })
+
+                    status_placeholder.success("✅ 生成成功！")
+
+                    # 直接在页面上显示结果
+                    with result_placeholder.container():
+                        st.markdown("### 🎬 生成结果")
+                        st.video(video_url)
+
+                except Exception as e:
+                    status_placeholder.error(f"❌ 生成失败: {str(e)}")
 
     st.divider()
 
@@ -433,36 +479,53 @@ with tab3:
             if not prompt:
                 st.warning("请输入提示词")
             else:
-                params = {
-                    'prompt': prompt,
-                    'model': model,
-                    'negative_prompt': negative_prompt,
-                    'resolution': resolution,
-                    'duration': duration,
-                    'watermark': watermark,
-                }
-                if seed > 0:
-                    params['seed'] = seed
-
-                task_id = create_task('t2v', params)
-                st.session_state.executor.submit(run_task, task_id, api_key, region, 't2v', params)
-
-                # 等待任务完成
+                # 同步执行，不使用后台线程，直接显示结果
                 status_placeholder = st.empty()
-                status_placeholder.info("⏳ 正在生成中，请稍候...")
+                result_placeholder = st.empty()
 
-                max_wait = 120  # 视频生成最多等待120秒
-                for i in range(max_wait):
-                    time.sleep(1)
-                    tasks = load_tasks()
-                    current_task = next((t for t in tasks if t['id'] == task_id), None)
-                    if current_task and current_task['status'] != 'running':
-                        break
+                status_placeholder.info("⏳ 正在生成中，请稍候（预计需要10-30秒）...")
 
-                status_placeholder.empty()
-                st.success("✅ 任务完成！")
-                time.sleep(1)
-                st.rerun()
+                try:
+                    client = QwenImg(api_key=api_key, region=region)
+
+                    # 直接调用生成
+                    video_url = client.text_to_video(
+                        prompt=prompt,
+                        model=model,
+                        negative_prompt=negative_prompt,
+                        resolution=resolution,
+                        duration=duration,
+                        watermark=watermark,
+                        seed=seed if seed > 0 else None
+                    )
+
+                    # 保存任务记录
+                    params = {
+                        'prompt': prompt,
+                        'model': model,
+                        'negative_prompt': negative_prompt,
+                        'resolution': resolution,
+                        'duration': duration,
+                        'watermark': watermark,
+                    }
+                    if seed > 0:
+                        params['seed'] = seed
+
+                    task_id = create_task('t2v', params)
+                    update_task(task_id, {
+                        'status': 'completed',
+                        'result': {'url': video_url}
+                    })
+
+                    status_placeholder.success("✅ 生成成功！")
+
+                    # 直接在页面上显示结果
+                    with result_placeholder.container():
+                        st.markdown("### 🎥 生成结果")
+                        st.video(video_url)
+
+                except Exception as e:
+                    status_placeholder.error(f"❌ 生成失败: {str(e)}")
 
     st.divider()
 
