@@ -206,12 +206,16 @@ if not api_key:
     st.stop()
 
 # ==================== 自动刷新机制 ====================
-# 检查是否有运行中的任务，如果有则3秒后自动刷新
+# 使用浏览器端的 meta refresh，避免阻塞主线程
 all_tasks = load_tasks()
 has_running = any(t['status'] == 'running' for t in all_tasks)
 if has_running:
-    time.sleep(3)
-    st.rerun()
+    st.markdown(
+        """
+        <meta http-equiv="refresh" content="3">
+        """,
+        unsafe_allow_html=True
+    )
 
 # ==================== 主界面 ====================
 tab1, tab2, tab3 = st.tabs(["📝 文生图", "🎬 图生视频", "🎥 文生视频"])
