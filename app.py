@@ -803,14 +803,11 @@ with tab1:
             # 更新任务状态
             st.session_state.t2i_task_status = 'running'
             st.session_state.t2i_task_error = None
-            show_status_message("任务已提交", "🎨 文生图任务已开始，您可以继续在其他tab准备任务", "info")
-            time.sleep(0.5)  # 短暂延迟让用户看到提示
             st.rerun()
 
     # 显示任务状态
     if st.session_state.t2i_task_status == 'running':
-        with st.spinner("🎨 正在生成图片，请稍候..."):
-            st.info("任务正在后台处理中，您也可以切换到其他tab准备新任务")
+        st.info("✨ 文生图任务正在后台执行中，您可以切换到其他tab继续创作其他任务")
     elif st.session_state.t2i_task_status == 'completed':
         st.success(f"✅ 生成成功！已生成 {len(st.session_state.t2i_results['images'])} 张图片")
         # 自动清除completed状态，允许再次生成
@@ -996,9 +993,6 @@ with tab2:
                 # 更新任务状态
                 st.session_state.i2v_task_status = 'running'
                 st.session_state.i2v_task_error = None
-                estimated = st.session_state.duration_i2v * 10
-                show_status_message("任务已提交", f"🎬 图生视频任务已开始（预计 {estimated}-{estimated+30} 秒），您可以继续在其他tab准备任务", "info")
-                time.sleep(0.5)
                 st.rerun()
 
             except Exception as e:
@@ -1007,8 +1001,7 @@ with tab2:
     # 显示任务状态
     if st.session_state.i2v_task_status == 'running':
         estimated = st.session_state.duration_i2v * 10
-        with st.spinner(f"🎬 正在生成视频，预计需要 {estimated}-{estimated+30} 秒..."):
-            st.info("任务正在后台处理中，您也可以切换到其他tab准备新任务")
+        st.info(f"✨ 图生视频任务正在后台执行中（预计 {estimated}-{estimated+30} 秒），您可以切换到其他tab继续创作其他任务")
     elif st.session_state.i2v_task_status == 'completed':
         st.success("✅ 生成成功！视频已生成完成")
         # 自动清除completed状态，允许再次生成
@@ -1146,16 +1139,12 @@ with tab3:
             # 更新任务状态
             st.session_state.t2v_task_status = 'running'
             st.session_state.t2v_task_error = None
-            estimated = st.session_state.duration_t2v * 10
-            show_status_message("任务已提交", f"🎥 文生视频任务已开始（预计 {estimated}-{estimated+30} 秒），您可以继续在其他tab准备任务", "info")
-            time.sleep(0.5)
             st.rerun()
 
     # 显示任务状态
     if st.session_state.t2v_task_status == 'running':
         estimated = st.session_state.duration_t2v * 10
-        with st.spinner(f"🎥 正在生成视频，预计需要 {estimated}-{estimated+30} 秒..."):
-            st.info("任务正在后台处理中，您也可以切换到其他tab准备新任务")
+        st.info(f"✨ 文生视频任务正在后台执行中（预计 {estimated}-{estimated+30} 秒），您可以切换到其他tab继续创作其他任务")
     elif st.session_state.t2v_task_status == 'completed':
         st.success("✅ 生成成功！视频已生成完成")
         # 自动清除completed状态，允许再次生成
