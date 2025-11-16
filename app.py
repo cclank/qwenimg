@@ -361,6 +361,7 @@ def check_and_process_results():
                 if result_data['status'] == 'success':
                     st.session_state.t2i_results = result_data['result']
                     st.session_state.t2i_task_status = 'completed'
+                    st.session_state.t2i_task_error = None
                     # 添加到历史
                     st.session_state.history.append({
                         'type': '文生图',
@@ -377,6 +378,7 @@ def check_and_process_results():
                 if result_data['status'] == 'success':
                     st.session_state.i2v_result = result_data['result']
                     st.session_state.i2v_task_status = 'completed'
+                    st.session_state.i2v_task_error = None
                     # 添加到历史
                     st.session_state.history.append({
                         'type': '图生视频',
@@ -393,6 +395,7 @@ def check_and_process_results():
                 if result_data['status'] == 'success':
                     st.session_state.t2v_result = result_data['result']
                     st.session_state.t2v_task_status = 'completed'
+                    st.session_state.t2v_task_error = None
                     # 添加到历史
                     st.session_state.history.append({
                         'type': '文生视频',
@@ -592,6 +595,33 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # 任务队列显示
+    st.markdown("### 🔄 任务队列")
+
+    running_tasks = []
+    if st.session_state.t2i_task_status == 'running':
+        running_tasks.append(("📝 文生图", "执行中..."))
+    if st.session_state.i2v_task_status == 'running':
+        running_tasks.append(("🎬 图生视频", "执行中..."))
+    if st.session_state.t2v_task_status == 'running':
+        running_tasks.append(("🎥 文生视频", "执行中..."))
+
+    if running_tasks:
+        for task_name, task_status in running_tasks:
+            st.markdown(f"""
+            <div style="background: #fff3cd; padding: 0.75rem; border-radius: 6px;
+                        margin-bottom: 0.5rem; border-left: 3px solid #ffc107;">
+                <div style="font-weight: 600; color: #856404;">{task_name}</div>
+                <div style="font-size: 0.85rem; color: #856404; margin-top: 0.25rem;">
+                    ⏳ {task_status}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("暂无运行中的任务")
+
+    st.markdown("---")
+
     # 历史记录
     st.markdown("### 📜 历史记录")
 
@@ -779,19 +809,15 @@ with tab1:
 
     # 显示任务状态
     if st.session_state.t2i_task_status == 'running':
-        st.info("🔄 文生图任务正在后台执行中，您可以切换到其他tab继续工作...")
+        st.info("🔄 任务执行中... (请查看侧边栏「任务队列」)")
     elif st.session_state.t2i_task_status == 'completed':
-        st.success(f"✅ 文生图任务已完成！成功生成 {len(st.session_state.t2i_results['images'])} 张图片")
-        # 自动清除completed状态，避免重复显示
-        if st.button("知道了", key="ack_t2i"):
-            st.session_state.t2i_task_status = None
-            st.rerun()
+        st.success(f"✅ 任务已完成！成功生成 {len(st.session_state.t2i_results['images'])} 张图片")
+        # 自动清除completed状态，允许再次生成
+        st.session_state.t2i_task_status = None
     elif st.session_state.t2i_task_status == 'error':
         show_status_message("生成失败", st.session_state.t2i_task_error, "error")
-        if st.button("知道了", key="ack_error_t2i"):
-            st.session_state.t2i_task_status = None
-            st.session_state.t2i_task_error = None
-            st.rerun()
+        # 自动清除error状态，允许重试
+        st.session_state.t2i_task_status = None
 
     # 显示结果
     if st.session_state.t2i_results:
@@ -979,18 +1005,15 @@ with tab2:
 
     # 显示任务状态
     if st.session_state.i2v_task_status == 'running':
-        st.info("🔄 图生视频任务正在后台执行中，您可以切换到其他tab继续工作...")
+        st.info("🔄 任务执行中... (请查看侧边栏「任务队列」)")
     elif st.session_state.i2v_task_status == 'completed':
-        st.success("✅ 图生视频任务已完成！")
-        if st.button("知道了", key="ack_i2v"):
-            st.session_state.i2v_task_status = None
-            st.rerun()
+        st.success("✅ 任务已完成！视频生成成功")
+        # 自动清除completed状态，允许再次生成
+        st.session_state.i2v_task_status = None
     elif st.session_state.i2v_task_status == 'error':
         show_status_message("生成失败", st.session_state.i2v_task_error, "error")
-        if st.button("知道了", key="ack_error_i2v"):
-            st.session_state.i2v_task_status = None
-            st.session_state.i2v_task_error = None
-            st.rerun()
+        # 自动清除error状态，允许重试
+        st.session_state.i2v_task_status = None
 
     # 显示结果
     if st.session_state.i2v_result:
@@ -1127,18 +1150,15 @@ with tab3:
 
     # 显示任务状态
     if st.session_state.t2v_task_status == 'running':
-        st.info("🔄 文生视频任务正在后台执行中，您可以切换到其他tab继续工作...")
+        st.info("🔄 任务执行中... (请查看侧边栏「任务队列」)")
     elif st.session_state.t2v_task_status == 'completed':
-        st.success("✅ 文生视频任务已完成！")
-        if st.button("知道了", key="ack_t2v"):
-            st.session_state.t2v_task_status = None
-            st.rerun()
+        st.success("✅ 任务已完成！视频生成成功")
+        # 自动清除completed状态，允许再次生成
+        st.session_state.t2v_task_status = None
     elif st.session_state.t2v_task_status == 'error':
         show_status_message("生成失败", st.session_state.t2v_task_error, "error")
-        if st.button("知道了", key="ack_error_t2v"):
-            st.session_state.t2v_task_status = None
-            st.session_state.t2v_task_error = None
-            st.rerun()
+        # 自动清除error状态，允许重试
+        st.session_state.t2v_task_status = None
 
     # 显示结果
     if st.session_state.t2v_result:
