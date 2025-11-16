@@ -20,6 +20,9 @@ import sys
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from PIL import Image
+import threading
+import queue
+import time
 
 # 添加项目路径
 project_root = Path(__file__).parent
@@ -320,6 +323,95 @@ def apply_custom_styles():
     </style>
     """, unsafe_allow_html=True)
 
+# ==================== 异步任务管理 ====================
+
+# 全局结果队列（线程安全）
+if 'result_queue' not in st.session_state:
+    st.session_state.result_queue = queue.Queue()
+
+def background_task_wrapper(task_id: str, task_func, result_queue, *args, **kwargs):
+    """后台任务包装器 - 在独立线程中执行任务"""
+    try:
+        result = task_func(*args, **kwargs)
+        result_queue.put({
+            'task_id': task_id,
+            'status': 'success',
+            'result': result,
+            'timestamp': datetime.now()
+        })
+    except Exception as e:
+        result_queue.put({
+            'task_id': task_id,
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now()
+        })
+
+def check_and_process_results():
+    """检查并处理完成的任务结果（在主线程中调用）"""
+    has_new_results = False
+
+    while not st.session_state.result_queue.empty():
+        try:
+            result_data = st.session_state.result_queue.get_nowait()
+            task_id = result_data['task_id']
+
+            # 根据任务ID更新对应的session_state
+            if task_id.startswith('t2i_'):
+                if result_data['status'] == 'success':
+                    st.session_state.t2i_results = result_data['result']
+                    st.session_state.t2i_task_status = 'completed'
+                    # 添加到历史
+                    st.session_state.history.append({
+                        'type': '文生图',
+                        'time': result_data['timestamp'].strftime("%Y-%m-%d %H:%M:%S"),
+                        'prompt': st.session_state.t2i_results['prompt'][:100],
+                        'count': st.session_state.t2i_results['params']['n'],
+                        'size': st.session_state.t2i_results['params']['size']
+                    })
+                else:
+                    st.session_state.t2i_task_error = result_data['error']
+                    st.session_state.t2i_task_status = 'error'
+
+            elif task_id.startswith('i2v_'):
+                if result_data['status'] == 'success':
+                    st.session_state.i2v_result = result_data['result']
+                    st.session_state.i2v_task_status = 'completed'
+                    # 添加到历史
+                    st.session_state.history.append({
+                        'type': '图生视频',
+                        'time': result_data['timestamp'].strftime("%Y-%m-%d %H:%M:%S"),
+                        'prompt': st.session_state.i2v_result.get('prompt', '无')[:100],
+                        'resolution': st.session_state.i2v_result['params']['resolution'],
+                        'duration': st.session_state.i2v_result['params']['duration']
+                    })
+                else:
+                    st.session_state.i2v_task_error = result_data['error']
+                    st.session_state.i2v_task_status = 'error'
+
+            elif task_id.startswith('t2v_'):
+                if result_data['status'] == 'success':
+                    st.session_state.t2v_result = result_data['result']
+                    st.session_state.t2v_task_status = 'completed'
+                    # 添加到历史
+                    st.session_state.history.append({
+                        'type': '文生视频',
+                        'time': result_data['timestamp'].strftime("%Y-%m-%d %H:%M:%S"),
+                        'prompt': st.session_state.t2v_result['prompt'][:100],
+                        'resolution': st.session_state.t2v_result['params']['resolution'],
+                        'duration': st.session_state.t2v_result['params']['duration']
+                    })
+                else:
+                    st.session_state.t2v_task_error = result_data['error']
+                    st.session_state.t2v_task_status = 'error'
+
+            has_new_results = True
+
+        except queue.Empty:
+            break
+
+    return has_new_results
+
 # ==================== 工具函数 ====================
 
 def init_session_state():
@@ -327,9 +419,12 @@ def init_session_state():
     # 全局状态
     defaults = {
         'history': [],
+        'last_check_time': time.time(),
 
         # 文生图
         't2i_results': None,
+        't2i_task_status': None,  # None, 'running', 'completed', 'error'
+        't2i_task_error': None,
         'prompt_t2i': "",
         'negative_prompt_t2i': "",
         'model_t2i': "wan2.5-t2i-preview",
@@ -341,6 +436,8 @@ def init_session_state():
 
         # 图生视频
         'i2v_result': None,
+        'i2v_task_status': None,
+        'i2v_task_error': None,
         'uploaded_image': None,
         'prompt_i2v': "",
         'negative_prompt_i2v': "",
@@ -352,6 +449,8 @@ def init_session_state():
 
         # 文生视频
         't2v_result': None,
+        't2v_task_status': None,
+        't2v_task_error': None,
         'prompt_t2v': "",
         'negative_prompt_t2v': "",
         'model_t2v': "wan2.5-t2v-preview",
@@ -386,66 +485,41 @@ def show_status_message(status: str, message: str, type: str = "info"):
     </div>
     """, unsafe_allow_html=True)
 
-# ==================== 任务执行函数 ====================
+# ==================== 任务执行函数（在后台线程中调用）====================
 
 def execute_t2i_task(client, kwargs):
-    """执行文生图任务（同步）"""
+    """执行文生图任务 - 返回结果而不直接修改session_state"""
     result = client.text_to_image(**kwargs)
 
-    st.session_state.t2i_results = {
+    return {
         'images': result if isinstance(result, list) else [result],
         'prompt': kwargs['prompt'],
         'params': kwargs
     }
 
-    # 添加历史记录
-    st.session_state.history.append({
-        'type': '文生图',
-        'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'prompt': kwargs['prompt'][:100],
-        'count': kwargs['n'],
-        'size': kwargs['size']
-    })
-
 def execute_i2v_task(client, kwargs, temp_image_path):
-    """执行图生视频任务（同步）"""
-    video_url = client.image_to_video(**kwargs)
-
-    st.session_state.i2v_result = {
-        'url': video_url,
-        'prompt': kwargs.get('prompt', ''),
-        'params': kwargs
-    }
-
-    st.session_state.history.append({
-        'type': '图生视频',
-        'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'prompt': kwargs.get('prompt', '无')[:100],
-        'resolution': kwargs['resolution'],
-        'duration': kwargs['duration']
-    })
-
-    # 清理临时文件
-    if temp_image_path and Path(temp_image_path).exists():
-        Path(temp_image_path).unlink()
+    """执行图生视频任务 - 返回结果而不直接修改session_state"""
+    try:
+        video_url = client.image_to_video(**kwargs)
+        return {
+            'url': video_url,
+            'prompt': kwargs.get('prompt', ''),
+            'params': kwargs
+        }
+    finally:
+        # 清理临时文件
+        if temp_image_path and Path(temp_image_path).exists():
+            Path(temp_image_path).unlink()
 
 def execute_t2v_task(client, kwargs):
-    """执行文生视频任务（同步）"""
+    """执行文生视频任务 - 返回结果而不直接修改session_state"""
     video_url = client.text_to_video(**kwargs)
 
-    st.session_state.t2v_result = {
+    return {
         'url': video_url,
         'prompt': kwargs['prompt'],
         'params': kwargs
     }
-
-    st.session_state.history.append({
-        'type': '文生视频',
-        'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'prompt': kwargs['prompt'][:100],
-        'resolution': kwargs['resolution'],
-        'duration': kwargs['duration']
-    })
 
 # ==================== 初始化 ====================
 
@@ -463,6 +537,29 @@ init_session_state()
 
 # 应用样式
 apply_custom_styles()
+
+# ==================== 定期检查任务结果 ====================
+
+# 检查是否有新的任务结果
+has_new_results = check_and_process_results()
+
+# 如果有运行中的任务，定期刷新页面检查结果
+current_time = time.time()
+has_running_tasks = (
+    st.session_state.t2i_task_status == 'running' or
+    st.session_state.i2v_task_status == 'running' or
+    st.session_state.t2v_task_status == 'running'
+)
+
+# 如果有任务在运行，每2秒自动刷新一次检查结果
+if has_running_tasks and (current_time - st.session_state.last_check_time > 2):
+    st.session_state.last_check_time = current_time
+    time.sleep(0.1)  # 短暂延迟避免过于频繁
+    st.rerun()
+
+# 如果刚处理了新结果，立即刷新界面显示
+if has_new_results:
+    st.rerun()
 
 # ==================== 页面标题 ====================
 
@@ -647,6 +744,8 @@ with tab1:
             show_status_message("配置错误", "请先在侧边栏配置 API Key", "error")
         elif not st.session_state.prompt_t2i.strip():
             show_status_message("输入错误", "请输入提示词", "warning")
+        elif st.session_state.t2i_task_status == 'running':
+            show_status_message("任务进行中", "当前已有文生图任务正在执行，请等待完成", "warning")
         else:
             kwargs = {
                 "prompt": st.session_state.prompt_t2i,
@@ -662,17 +761,37 @@ with tab1:
             if st.session_state.seed_t2i > 0:
                 kwargs["seed"] = st.session_state.seed_t2i
 
-            # 同步执行，使用spinner显示进度
-            try:
-                with st.spinner("🎨 正在生成图片，请稍候..."):
-                    execute_t2i_task(client, kwargs)
-                show_status_message(
-                    "生成成功",
-                    f"已成功生成 {len(st.session_state.t2i_results['images'])} 张图片",
-                    "success"
-                )
-            except Exception as e:
-                show_status_message("生成失败", str(e), "error")
+            # 异步提交任务到后台线程
+            task_id = f"t2i_{int(time.time() * 1000)}"
+            thread = threading.Thread(
+                target=background_task_wrapper,
+                args=(task_id, execute_t2i_task, st.session_state.result_queue, client, kwargs),
+                daemon=True
+            )
+            thread.start()
+
+            # 更新任务状态
+            st.session_state.t2i_task_status = 'running'
+            st.session_state.t2i_task_error = None
+            show_status_message("任务已提交", "🎨 文生图任务已开始，您可以继续在其他tab准备任务", "info")
+            time.sleep(0.5)  # 短暂延迟让用户看到提示
+            st.rerun()
+
+    # 显示任务状态
+    if st.session_state.t2i_task_status == 'running':
+        st.info("🔄 文生图任务正在后台执行中，您可以切换到其他tab继续工作...")
+    elif st.session_state.t2i_task_status == 'completed':
+        st.success(f"✅ 文生图任务已完成！成功生成 {len(st.session_state.t2i_results['images'])} 张图片")
+        # 自动清除completed状态，避免重复显示
+        if st.button("知道了", key="ack_t2i"):
+            st.session_state.t2i_task_status = None
+            st.rerun()
+    elif st.session_state.t2i_task_status == 'error':
+        show_status_message("生成失败", st.session_state.t2i_task_error, "error")
+        if st.button("知道了", key="ack_error_t2i"):
+            st.session_state.t2i_task_status = None
+            st.session_state.t2i_task_error = None
+            st.rerun()
 
     # 显示结果
     if st.session_state.t2i_results:
@@ -817,6 +936,8 @@ with tab2:
             show_status_message("配置错误", "请先在侧边栏配置 API Key", "error")
         elif not st.session_state.uploaded_image:
             show_status_message("输入错误", "请上传图片", "warning")
+        elif st.session_state.i2v_task_status == 'running':
+            show_status_message("任务进行中", "当前已有图生视频任务正在执行，请等待完成", "warning")
         else:
             try:
                 temp_image_path = Path("/tmp/qwenimg_upload_i2v.png")
@@ -836,14 +957,40 @@ with tab2:
                 if st.session_state.seed_i2v > 0:
                     kwargs["seed"] = st.session_state.seed_i2v
 
-                # 同步执行，使用spinner显示进度
+                # 异步提交任务到后台线程
+                task_id = f"i2v_{int(time.time() * 1000)}"
+                thread = threading.Thread(
+                    target=background_task_wrapper,
+                    args=(task_id, execute_i2v_task, st.session_state.result_queue, client, kwargs, str(temp_image_path)),
+                    daemon=True
+                )
+                thread.start()
+
+                # 更新任务状态
+                st.session_state.i2v_task_status = 'running'
+                st.session_state.i2v_task_error = None
                 estimated = st.session_state.duration_i2v * 10
-                with st.spinner(f"🎬 正在生成视频，预计需要 {estimated}-{estimated+30} 秒..."):
-                    execute_i2v_task(client, kwargs, str(temp_image_path))
-                show_status_message("生成成功", "视频已生成完成", "success")
+                show_status_message("任务已提交", f"🎬 图生视频任务已开始（预计 {estimated}-{estimated+30} 秒），您可以继续在其他tab准备任务", "info")
+                time.sleep(0.5)
+                st.rerun()
 
             except Exception as e:
                 show_status_message("生成失败", str(e), "error")
+
+    # 显示任务状态
+    if st.session_state.i2v_task_status == 'running':
+        st.info("🔄 图生视频任务正在后台执行中，您可以切换到其他tab继续工作...")
+    elif st.session_state.i2v_task_status == 'completed':
+        st.success("✅ 图生视频任务已完成！")
+        if st.button("知道了", key="ack_i2v"):
+            st.session_state.i2v_task_status = None
+            st.rerun()
+    elif st.session_state.i2v_task_status == 'error':
+        show_status_message("生成失败", st.session_state.i2v_task_error, "error")
+        if st.button("知道了", key="ack_error_i2v"):
+            st.session_state.i2v_task_status = None
+            st.session_state.i2v_task_error = None
+            st.rerun()
 
     # 显示结果
     if st.session_state.i2v_result:
@@ -946,6 +1093,8 @@ with tab3:
             show_status_message("配置错误", "请先在侧边栏配置 API Key", "error")
         elif not st.session_state.prompt_t2v.strip():
             show_status_message("输入错误", "请输入提示词", "warning")
+        elif st.session_state.t2v_task_status == 'running':
+            show_status_message("任务进行中", "当前已有文生视频任务正在执行，请等待完成", "warning")
         else:
             kwargs = {
                 "prompt": st.session_state.prompt_t2v,
@@ -959,14 +1108,37 @@ with tab3:
             if st.session_state.seed_t2v > 0:
                 kwargs["seed"] = st.session_state.seed_t2v
 
-            # 同步执行，使用spinner显示进度
-            try:
-                estimated = st.session_state.duration_t2v * 10
-                with st.spinner(f"🎥 正在生成视频，预计需要 {estimated}-{estimated+30} 秒..."):
-                    execute_t2v_task(client, kwargs)
-                show_status_message("生成成功", "视频已生成完成", "success")
-            except Exception as e:
-                show_status_message("生成失败", str(e), "error")
+            # 异步提交任务到后台线程
+            task_id = f"t2v_{int(time.time() * 1000)}"
+            thread = threading.Thread(
+                target=background_task_wrapper,
+                args=(task_id, execute_t2v_task, st.session_state.result_queue, client, kwargs),
+                daemon=True
+            )
+            thread.start()
+
+            # 更新任务状态
+            st.session_state.t2v_task_status = 'running'
+            st.session_state.t2v_task_error = None
+            estimated = st.session_state.duration_t2v * 10
+            show_status_message("任务已提交", f"🎥 文生视频任务已开始（预计 {estimated}-{estimated+30} 秒），您可以继续在其他tab准备任务", "info")
+            time.sleep(0.5)
+            st.rerun()
+
+    # 显示任务状态
+    if st.session_state.t2v_task_status == 'running':
+        st.info("🔄 文生视频任务正在后台执行中，您可以切换到其他tab继续工作...")
+    elif st.session_state.t2v_task_status == 'completed':
+        st.success("✅ 文生视频任务已完成！")
+        if st.button("知道了", key="ack_t2v"):
+            st.session_state.t2v_task_status = None
+            st.rerun()
+    elif st.session_state.t2v_task_status == 'error':
+        show_status_message("生成失败", st.session_state.t2v_task_error, "error")
+        if st.button("知道了", key="ack_error_t2v"):
+            st.session_state.t2v_task_status = None
+            st.session_state.t2v_task_error = None
+            st.rerun()
 
     # 显示结果
     if st.session_state.t2v_result:
