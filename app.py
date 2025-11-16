@@ -556,18 +556,16 @@ with tab1:
 
     # 输入区域
     with st.container():
-        prompt_t2i = st.text_area(
+        st.text_area(
             "提示词 *",
-            value=st.session_state.prompt_t2i,
             height=120,
             placeholder="例如: 一只可爱的橘猫坐在窗台上，阳光洒在它身上，背景是蓝天白云...",
             help="详细描述你想要生成的图片",
             key="prompt_t2i"
         )
 
-        negative_prompt_t2i = st.text_input(
+        st.text_input(
             "负面提示词（可选）",
-            value=st.session_state.negative_prompt_t2i,
             placeholder="例如: 模糊、低质量、变形...",
             help="描述不希望出现的内容",
             key="negative_prompt_t2i"
@@ -577,34 +575,30 @@ with tab1:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        model_t2i = st.selectbox(
+        st.selectbox(
             "模型",
             ["wan2.5-t2i-preview", "wanx-v1"],
-            index=["wan2.5-t2i-preview", "wanx-v1"].index(st.session_state.model_t2i),
             key="model_t2i"
         )
 
     with col2:
-        size_t2i = st.selectbox(
+        st.selectbox(
             "尺寸",
             ["1024*1024", "1280*720", "720*1280"],
-            index=["1024*1024", "1280*720", "720*1280"].index(st.session_state.size_t2i),
             key="size_t2i"
         )
 
     with col3:
-        n_images = st.selectbox(
+        st.selectbox(
             "数量",
             [1, 2, 3, 4],
-            index=[1, 2, 3, 4].index(st.session_state.n_images),
             key="n_images"
         )
 
     with col4:
-        seed_t2i = st.number_input(
+        st.number_input(
             "随机种子",
             min_value=0,
-            value=st.session_state.seed_t2i,
             help="0表示随机",
             key="seed_t2i"
         )
@@ -613,16 +607,14 @@ with tab1:
     with st.expander("高级选项"):
         col1, col2 = st.columns(2)
         with col1:
-            prompt_extend = st.checkbox(
+            st.checkbox(
                 "自动扩展提示词",
-                value=st.session_state.prompt_extend,
                 key="prompt_extend",
                 help="AI会自动优化和扩展你的提示词"
             )
         with col2:
-            watermark_t2i = st.checkbox(
+            st.checkbox(
                 "添加水印",
-                value=st.session_state.watermark_t2i,
                 key="watermark_t2i"
             )
 
@@ -744,18 +736,16 @@ with tab2:
             st.image(st.session_state.uploaded_image, caption="预览", width=400)
 
     # 提示词
-    prompt_i2v = st.text_area(
+    st.text_area(
         "提示词（可选）",
-        value=st.session_state.prompt_i2v,
         height=100,
         placeholder="例如: 画面中的人物缓缓转身，云雾翻涌，镜头缓慢推进...",
         help="描述视频中的动作和变化",
         key="prompt_i2v"
     )
 
-    negative_prompt_i2v = st.text_input(
+    st.text_input(
         "负面提示词（可选）",
-        value=st.session_state.negative_prompt_i2v,
         placeholder="例如: 模糊、抖动、失真...",
         key="negative_prompt_i2v"
     )
@@ -764,40 +754,36 @@ with tab2:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        model_i2v = st.selectbox(
+        st.selectbox(
             "模型",
             ["wan2.5-i2v-preview"],
             key="model_i2v"
         )
 
     with col2:
-        resolution_i2v = st.selectbox(
+        st.selectbox(
             "分辨率",
             ["1080P", "720P", "480P"],
-            index=["1080P", "720P", "480P"].index(st.session_state.resolution_i2v),
             key="resolution_i2v"
         )
 
     with col3:
-        duration_i2v = st.selectbox(
+        st.selectbox(
             "时长(秒)",
             [10, 5],
-            index=[10, 5].index(st.session_state.duration_i2v),
             key="duration_i2v"
         )
 
     with col4:
-        seed_i2v = st.number_input(
+        st.number_input(
             "随机种子",
             min_value=0,
-            value=st.session_state.seed_i2v,
             key="seed_i2v"
         )
 
     with st.expander("高级选项"):
-        watermark_i2v = st.checkbox(
+        st.checkbox(
             "添加水印",
-            value=st.session_state.watermark_i2v,
             key="watermark_i2v"
         )
 
@@ -880,18 +866,16 @@ with tab3:
     st.caption("使用文字描述生成动态视频")
 
     # 提示词
-    prompt_t2v = st.text_area(
+    st.text_area(
         "提示词 *",
-        value=st.session_state.prompt_t2v,
         height=120,
         placeholder="例如: 一只柴犬在绿色草地上奔跑，阳光明媚，春天的气息，镜头跟随...",
         help="详细描述视频场景和动作",
         key="prompt_t2v"
     )
 
-    negative_prompt_t2v = st.text_input(
+    st.text_input(
         "负面提示词（可选）",
-        value=st.session_state.negative_prompt_t2v,
         placeholder="例如: 模糊、静止、低质量...",
         key="negative_prompt_t2v"
     )
@@ -900,40 +884,36 @@ with tab3:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        model_t2v = st.selectbox(
+        st.selectbox(
             "模型",
             ["wan2.5-t2v-preview"],
             key="model_t2v"
         )
 
     with col2:
-        resolution_t2v = st.selectbox(
+        st.selectbox(
             "分辨率",
             ["1080P", "720P", "480P"],
-            index=["1080P", "720P", "480P"].index(st.session_state.resolution_t2v),
             key="resolution_t2v"
         )
 
     with col3:
-        duration_t2v = st.selectbox(
+        st.selectbox(
             "时长(秒)",
             [10, 5],
-            index=[10, 5].index(st.session_state.duration_t2v),
             key="duration_t2v"
         )
 
     with col4:
-        seed_t2v = st.number_input(
+        st.number_input(
             "随机种子",
             min_value=0,
-            value=st.session_state.seed_t2v,
             key="seed_t2v"
         )
 
     with st.expander("高级选项"):
-        watermark_t2v = st.checkbox(
+        st.checkbox(
             "添加水印",
-            value=st.session_state.watermark_t2v,
             key="watermark_t2v"
         )
 
