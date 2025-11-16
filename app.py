@@ -142,17 +142,19 @@ def run_task(task_id: str, api_key: str, region: str, task_type: str, params: Di
             })
 
         elif task_type == 'i2v':
-            result = client.image_to_video(**params)
+            # image_to_video 返回的是视频 URL 字符串
+            video_url = client.image_to_video(**params)
             update_task(task_id, {
                 'status': 'completed',
-                'result': {'url': result['video_url']}
+                'result': {'url': video_url}
             })
 
         elif task_type == 't2v':
-            result = client.text_to_video(**params)
+            # text_to_video 返回的是视频 URL 字符串
+            video_url = client.text_to_video(**params)
             update_task(task_id, {
                 'status': 'completed',
-                'result': {'url': result['video_url']}
+                'result': {'url': video_url}
             })
 
     except Exception as e:
