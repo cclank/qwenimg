@@ -809,9 +809,10 @@ with tab1:
 
     # 显示任务状态
     if st.session_state.t2i_task_status == 'running':
-        st.info("🔄 任务执行中... (请查看侧边栏「任务队列」)")
+        with st.spinner("🎨 正在生成图片，请稍候..."):
+            st.info("任务正在后台处理中，您也可以切换到其他tab准备新任务")
     elif st.session_state.t2i_task_status == 'completed':
-        st.success(f"✅ 任务已完成！成功生成 {len(st.session_state.t2i_results['images'])} 张图片")
+        st.success(f"✅ 生成成功！已生成 {len(st.session_state.t2i_results['images'])} 张图片")
         # 自动清除completed状态，允许再次生成
         st.session_state.t2i_task_status = None
     elif st.session_state.t2i_task_status == 'error':
@@ -1005,9 +1006,11 @@ with tab2:
 
     # 显示任务状态
     if st.session_state.i2v_task_status == 'running':
-        st.info("🔄 任务执行中... (请查看侧边栏「任务队列」)")
+        estimated = st.session_state.duration_i2v * 10
+        with st.spinner(f"🎬 正在生成视频，预计需要 {estimated}-{estimated+30} 秒..."):
+            st.info("任务正在后台处理中，您也可以切换到其他tab准备新任务")
     elif st.session_state.i2v_task_status == 'completed':
-        st.success("✅ 任务已完成！视频生成成功")
+        st.success("✅ 生成成功！视频已生成完成")
         # 自动清除completed状态，允许再次生成
         st.session_state.i2v_task_status = None
     elif st.session_state.i2v_task_status == 'error':
@@ -1150,9 +1153,11 @@ with tab3:
 
     # 显示任务状态
     if st.session_state.t2v_task_status == 'running':
-        st.info("🔄 任务执行中... (请查看侧边栏「任务队列」)")
+        estimated = st.session_state.duration_t2v * 10
+        with st.spinner(f"🎥 正在生成视频，预计需要 {estimated}-{estimated+30} 秒..."):
+            st.info("任务正在后台处理中，您也可以切换到其他tab准备新任务")
     elif st.session_state.t2v_task_status == 'completed':
-        st.success("✅ 任务已完成！视频生成成功")
+        st.success("✅ 生成成功！视频已生成完成")
         # 自动清除completed状态，允许再次生成
         st.session_state.t2v_task_status = None
     elif st.session_state.t2v_task_status == 'error':
