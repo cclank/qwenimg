@@ -190,6 +190,10 @@ with st.sidebar:
 
     st.divider()
 
+    # 手动刷新按钮
+    if st.button("🔄 刷新结果", use_container_width=True, help="点击查看最新任务结果"):
+        st.rerun()
+
     if st.button("🗑️ 清空所有", use_container_width=True):
         save_tasks([])
         # 删除所有图片文件
@@ -204,18 +208,6 @@ with st.sidebar:
 if not api_key:
     st.warning("⚠️ 请在侧边栏输入 API Key")
     st.stop()
-
-# ==================== 自动刷新机制 ====================
-# 使用浏览器端的 meta refresh，避免阻塞主线程
-all_tasks = load_tasks()
-has_running = any(t['status'] == 'running' for t in all_tasks)
-if has_running:
-    st.markdown(
-        """
-        <meta http-equiv="refresh" content="3">
-        """,
-        unsafe_allow_html=True
-    )
 
 # ==================== 主界面 ====================
 tab1, tab2, tab3 = st.tabs(["📝 文生图", "🎬 图生视频", "🎥 文生视频"])
