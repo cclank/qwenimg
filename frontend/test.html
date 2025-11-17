@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>QwenImg 测试页面</h1>
+
+    <h2>后端连接测试</h2>
+    <button onclick="testBackend()">测试后端连接</button>
+    <div id="backend-result"></div>
+
+    <h2>WebSocket测试</h2>
+    <button onclick="testWebSocket()">测试WebSocket</button>
+    <div id="ws-result"></div>
+
+    <script>
+        async function testBackend() {
+            const result = document.getElementById('backend-result');
+            result.innerHTML = '测试中...';
+
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.json();
+                result.innerHTML = `<p class="success">✅ 后端连接成功！</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ 后端连接失败：${error.message}</p>`;
+            }
+        }
+
+        function testWebSocket() {
+            const result = document.getElementById('ws-result');
+            result.innerHTML = '连接中...';
+
+            try {
+                const sessionId = 'test-' + Date.now();
+                const ws = new WebSocket(`ws://localhost:8000/ws/${sessionId}`);
+
+                ws.onopen = () => {
+                    result.innerHTML = '<p class="success">✅ WebSocket连接成功！</p>';
+                    setTimeout(() => ws.close(), 2000);
+                };
+
+                ws.onerror = (error) => {
+                    result.innerHTML = `<p class="error">❌ WebSocket连接失败</p>`;
+                };
+
+                ws.onclose = () => {
+                    result.innerHTML += '<p>WebSocket已关闭</p>';
+                };
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ WebSocket错误：${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
