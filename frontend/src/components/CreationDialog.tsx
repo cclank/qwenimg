@@ -152,8 +152,8 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
         <div className="dialog-header">
           <div className="dialog-tabs-container">
             <div className="dialog-tabs">
-              {/* 图片上传按钮 */}
-              {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
+              {/* 图片上传按钮 - 仅图生视频模式显示 */}
+              {mediaMode === 'image_to_video' && (
                 <Form.Item name="image_upload" noStyle>
                   <Upload
                     accept="image/*"
@@ -164,15 +164,17 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                     <button
                       type="button"
                       className="control-select-btn"
+                      title="上传参考图片用于图生视频"
                       style={{
                         height: '74px',
                         aspectRatio: '1.72',
-                        border: '2px dashed var(--color-border)',
-                        borderRadius: 'var(--radius-md)'
+                        border: `2px dashed ${imageUrl ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        background: imageUrl ? 'var(--color-gray-50)' : 'transparent'
                       }}
                     >
                       <PictureOutlined />
-                      <span>Image refs</span>
+                      <span>{imageUrl ? '已上传' : '上传图片'}</span>
                     </button>
                   </Upload>
                 </Form.Item>
@@ -189,8 +191,9 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 onClick={() => {
                   setMediaMode('image');
                   setTaskType('text_to_image');
+                  setImageUrl(''); // 清除图片
                 }}
-                title="文生图"
+                title="文生图 - 使用文字描述生成图片"
               >
                 <PictureOutlined />
               </button>
@@ -200,8 +203,9 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 onClick={() => {
                   setMediaMode('video');
                   setTaskType('text_to_video');
+                  setImageUrl(''); // 清除图片
                 }}
-                title="文生视频"
+                title="文生视频 - 使用文字描述生成视频"
               >
                 <VideoCameraOutlined />
               </button>
@@ -212,7 +216,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   setMediaMode('image_to_video');
                   setTaskType('image_to_video');
                 }}
-                title="图生视频"
+                title="图生视频 - 上传图片生成动态视频"
               >
                 <div className="image-to-video-single-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -254,7 +258,11 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
           {/* 左侧控制按钮 - 桌面端显示 */}
           <div className="dialog-controls">
             <Dropdown menu={{ items: modelOptions }} placement="topLeft">
-              <button type="button" className="control-select-btn">
+              <button
+                type="button"
+                className="control-select-btn"
+                title={`模型选择 - 当前: ${mediaMode === 'image' ? 'Wan 2.5 图像模型' : 'Wan 2.5 视频模型'}`}
+              >
                 <PictureOutlined />
                 <span>{mediaMode === 'image' ? 'Wan 2.5 Image' : 'Wan 2.5 Video'}</span>
               </button>
@@ -274,7 +282,11 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   />
                 </Form.Item>
                 <Dropdown menu={{ items: aspectRatioOptions }} placement="topLeft">
-                  <button type="button" className="control-select-btn">
+                  <button
+                    type="button"
+                    className="control-select-btn"
+                    title="图片尺寸比例 - 选择生成图片的宽高比"
+                  >
                     <div style={{
                       width: '20px',
                       height: '20px',
@@ -289,7 +301,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                         borderRadius: '2px'
                       }} />
                     </div>
-                    <span>1:1</span>
+                    <span>{form.getFieldValue('size') === '1024*1024' ? '1:1' : form.getFieldValue('size') === '1280*720' ? '16:9' : form.getFieldValue('size') === '720*1280' ? '9:16' : '4:3'}</span>
                   </button>
                 </Dropdown>
 
@@ -297,7 +309,11 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   <Select style={{ display: 'none' }} />
                 </Form.Item>
                 <Dropdown menu={{ items: numberOptions }} placement="topLeft">
-                  <button type="button" className="control-select-btn">
+                  <button
+                    type="button"
+                    className="control-select-btn"
+                    title="生成数量 - 一次生成多少张图片（1-4张）"
+                  >
                     <NumberOutlined />
                     <span>{form.getFieldValue('n') || 1}</span>
                   </button>
@@ -307,16 +323,48 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
 
             {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
               <>
-                <Form.Item name="resolution" noStyle>
-                  <Select style={{ display: 'none' }}>
+                <Dropdown menu={{ items: [
+                  { key: '480P', label: '480P', onClick: () => form.setFieldValue('resolution', '480P') },
+                  { key: '720P', label: '720P', onClick: () => form.setFieldValue('resolution', '720P') },
+                  { key: '1080P', label: '1080P', onClick: () => form.setFieldValue('resolution', '1080P') },
+                ]}} placement="topLeft">
+                  <button
+                    type="button"
+                    className="control-select-btn"
+                    title="视频分辨率 - 选择生成视频的清晰度"
+                  >
+                    <VideoCameraOutlined />
+                    <span>{form.getFieldValue('resolution') || '1080P'}</span>
+                  </button>
+                </Dropdown>
+
+                <Dropdown menu={{ items: [
+                  { key: '5', label: '5秒', onClick: () => form.setFieldValue('duration', 5) },
+                  { key: '10', label: '10秒', onClick: () => form.setFieldValue('duration', 10) },
+                ]}} placement="topLeft">
+                  <button
+                    type="button"
+                    className="control-select-btn"
+                    title="视频时长 - 选择生成视频的长度"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginRight: '2px' }}>
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
+                      <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    <span>{form.getFieldValue('duration') || 10}秒</span>
+                  </button>
+                </Dropdown>
+
+                <Form.Item name="resolution" hidden>
+                  <Select>
                     <Option value="480P">480P</Option>
                     <Option value="720P">720P</Option>
                     <Option value="1080P">1080P</Option>
                   </Select>
                 </Form.Item>
 
-                <Form.Item name="duration" noStyle>
-                  <Select style={{ display: 'none' }}>
+                <Form.Item name="duration" hidden>
+                  <Select>
                     <Option value={5}>5秒</Option>
                     <Option value={10}>10秒</Option>
                   </Select>
@@ -329,6 +377,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
               type="button"
               className="control-select-btn"
               onClick={() => setShowAdvanced(!showAdvanced)}
+              title="高级配置 - 设置负面提示词、随机种子等"
             >
               <SettingOutlined />
               <span>高级</span>
@@ -341,9 +390,16 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
               type="submit"
               className="generate-btn"
               disabled={loading}
+              title={loading ? '生成中...' : '开始生成'}
               aria-label="Generate"
             >
-              <ArrowUpOutlined />
+              {loading ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" opacity="0.3"/>
+                </svg>
+              ) : (
+                <ArrowUpOutlined />
+              )}
             </button>
           </div>
         </div>

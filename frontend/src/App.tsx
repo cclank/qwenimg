@@ -78,13 +78,13 @@ function App() {
     },
     {
       key: 'history',
-      label: '历史',
+      label: '历史记录',
       icon: <HistoryOutlined />,
       onClick: () => setViewMode('history'),
     },
     {
       key: 'inspiration',
-      label: '灵感',
+      label: '灵感画廊',
       icon: <BulbOutlined />,
       onClick: () => setViewMode('inspiration'),
     },
@@ -150,14 +150,48 @@ function App() {
       {/* 主内容区域 */}
       <main className="app-main">
         {viewMode === 'create' && <CreationDialog />}
-        {viewMode === 'history' && <History />}
-        {viewMode === 'inspiration' && <Inspiration />}
 
-        {/* 结果展示区域 */}
+        {viewMode === 'history' && (
+          <div>
+            <Button
+              onClick={() => setViewMode('create')}
+              style={{
+                marginBottom: '16px',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              返回创作
+            </Button>
+            <History />
+          </div>
+        )}
+
+        {viewMode === 'inspiration' && (
+          <div>
+            <Button
+              onClick={() => setViewMode('create')}
+              style={{
+                marginBottom: '16px',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              返回创作
+            </Button>
+            <Inspiration />
+          </div>
+        )}
+
+        {/* 结果展示区域 - 最新的在前面 */}
         {viewMode === 'create' && (
           <div className="results-masonry">
             {tasks
               .filter((task) => task.status === 'completed')
+              .sort((a, b) => {
+                // 按创建时间倒序排序（最新的在前）
+                const timeA = new Date(a.created_at || 0).getTime();
+                const timeB = new Date(b.created_at || 0).getTime();
+                return timeB - timeA;
+              })
               .slice(0, 3)
               .map((task) => (
                 <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(33.333% - 21px)' }}>
