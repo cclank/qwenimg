@@ -4,14 +4,14 @@
 import React, { useState } from 'react';
 import {
   Form, Input, Select, Upload, message, InputNumber,
-  Switch, Dropdown, type MenuProps
+  Switch, Dropdown, Modal, type MenuProps
 } from 'antd';
 import {
   PictureOutlined, VideoCameraOutlined,
   UploadOutlined, SettingOutlined,
-  ArrowUpOutlined, ThunderboltOutlined
+  ArrowUpOutlined, NumberOutlined
 } from '@ant-design/icons';
-import { api } from '@/services/api';
+import api, { generationAPI } from '@/services/api';
 import { useAppStore } from '@/store';
 
 const { TextArea } = Input;
@@ -22,7 +22,7 @@ interface CreationDialogProps {
 }
 
 type TaskType = 'text_to_image' | 'text_to_video' | 'image_to_video';
-type MediaMode = 'image' | 'video';
+type MediaMode = 'image' | 'video' | 'image_to_video';
 
 export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
   const sessionId = useAppStore((state) => state.sessionId);
@@ -33,14 +33,17 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
   const [taskType, setTaskType] = useState<TaskType>('text_to_image');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // 处理模式切换
   const handleModeChange = (mode: MediaMode) => {
     setMediaMode(mode);
     if (mode === 'image') {
       setTaskType('text_to_image');
-    } else {
-      setTaskType(imageUrl ? 'image_to_video' : 'text_to_video');
+    } else if (mode === 'video') {
+      setTaskType('text_to_video');
+    } else if (mode === 'image_to_video') {
+      setTaskType('image_to_video');
     }
   };
 
@@ -50,11 +53,11 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
     formData.append('file', file);
 
     try {
-      const res = await api.uploadImage(formData);
-      setImageUrl(res.data.url);
-      form.setFieldValue('image_url', res.data.url);
+      const res = await generationAPI.uploadImage(formData);
+      setImageUrl(res.url);
+      form.setFieldValue('image_url', res.url);
 
-      if (mediaMode === 'video') {
+      if (mediaMode === 'video' || mediaMode === 'image_to_video') {
         setTaskType('image_to_video');
       }
 
@@ -81,19 +84,19 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
       let response;
       switch (taskType) {
         case 'text_to_image':
-          response = await api.textToImage(params);
+          response = await generationAPI.textToImage(params);
           break;
         case 'text_to_video':
-          response = await api.textToVideo(params);
+          response = await generationAPI.textToVideo(params);
           break;
         case 'image_to_video':
-          response = await api.imageToVideo(params);
+          response = await generationAPI.imageToVideo(params);
           break;
       }
 
       // 添加到任务列表
       addTask({
-        task_id: response.data.task_id,
+        task_id: response.task_id,
         task_type: taskType,
         status: 'pending',
         progress: 0,
@@ -138,7 +141,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
         layout="vertical"
         initialValues={{
           model: 'wan2.5-t2i-preview',
-          n: 4,
+          n: 1,
           size: '1024*1024',
           resolution: '1080P',
           duration: 10,
@@ -150,7 +153,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
           <div className="dialog-tabs-container">
             <div className="dialog-tabs">
               {/* 图片上传按钮 */}
-              {mediaMode === 'video' && (
+              {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
                 <Form.Item name="image_upload" noStyle>
                   <Upload
                     accept="image/*"
@@ -177,24 +180,49 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
             </div>
           </div>
 
-          {/* 模式切换器 */}
-          <div className="dialog-mode-selector">
-            <div className="mode-toggle">
+          {/* 右上角模式切换器 */}
+          <div className="dialog-mode-selector-top-right">
+            <div className="mode-toggle-icons">
               <button
                 type="button"
-                className={`mode-toggle-btn ${mediaMode === 'image' ? 'active' : ''}`}
-                onClick={() => handleModeChange('image')}
+                className={`mode-icon-btn ${mediaMode === 'image' ? 'active' : ''}`}
+                onClick={() => {
+                  setMediaMode('image');
+                  setTaskType('text_to_image');
+                }}
+                title="文生图"
               >
                 <PictureOutlined />
-                <span>Image</span>
               </button>
               <button
                 type="button"
-                className={`mode-toggle-btn ${mediaMode === 'video' ? 'active' : ''}`}
-                onClick={() => handleModeChange('video')}
+                className={`mode-icon-btn ${mediaMode === 'video' ? 'active' : ''}`}
+                onClick={() => {
+                  setMediaMode('video');
+                  setTaskType('text_to_video');
+                }}
+                title="文生视频"
               >
                 <VideoCameraOutlined />
-                <span>Video</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-icon-btn ${mediaMode === 'image_to_video' ? 'active' : ''}`}
+                onClick={() => {
+                  setMediaMode('image_to_video');
+                  setTaskType('image_to_video');
+                }}
+                title="图生视频"
+              >
+                <div className="image-to-video-single-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M8 10C8 8.89543 8.89543 8 10 8H14C15.1046 8 16 8.89543 16 10V14C16 15.1046 15.1046 16 14 16H10C8.89543 16 8 15.1046 8 14V10Z" stroke="currentColor" strokeWidth="1.5"/>
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                    <path d="M16 8L19 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M16 16L19 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
               </button>
             </div>
           </div>
@@ -209,7 +237,11 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 placeholder={
                   mediaMode === 'image'
                     ? 'Describe your image...'
-                    : 'Describe your video scene...'
+                    : mediaMode === 'video'
+                    ? 'Describe your video scene...'
+                    : imageUrl
+                    ? 'Describe how you want to transform this image into a video...'
+                    : 'First upload an image, then describe how you want to transform it into a video...'
                 }
                 maxLength={2000}
               />
@@ -266,14 +298,14 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 </Form.Item>
                 <Dropdown menu={{ items: numberOptions }} placement="topLeft">
                   <button type="button" className="control-select-btn">
-                    <ThunderboltOutlined />
-                    <span>4</span>
+                    <NumberOutlined />
+                    <span>{form.getFieldValue('n') || 1}</span>
                   </button>
                 </Dropdown>
               </>
             )}
 
-            {mediaMode === 'video' && (
+            {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
               <>
                 <Form.Item name="resolution" noStyle>
                   <Select style={{ display: 'none' }}>
@@ -291,14 +323,20 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 </Form.Item>
               </>
             )}
+
+            {/* 高级配置按钮 */}
+            <button
+              type="button"
+              className="control-select-btn"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <SettingOutlined />
+              <span>高级</span>
+            </button>
           </div>
 
           {/* 右侧动作按钮 */}
           <div className="dialog-actions">
-            <div className="credit-display">
-              <ThunderboltOutlined />
-              <span>1,661</span>
-            </div>
             <button
               type="submit"
               className="generate-btn"
@@ -309,6 +347,47 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
             </button>
           </div>
         </div>
+
+        {/* 高级配置区域 */}
+        {showAdvanced && (
+          <div className="advanced-settings">
+            <div className="advanced-settings-content">
+              <Form.Item
+                name="negative_prompt"
+                label="负面提示词"
+                rules={[{ max: 1000, message: '负面提示词不能超过1000个字符' }]}
+              >
+                <Input.TextArea
+                  placeholder="输入不希望在生成结果中出现的内容..."
+                  autoSize={{ minRows: 2, maxRows: 4 }}
+                  maxLength={1000}
+                />
+              </Form.Item>
+
+              <div className="advanced-settings-row">
+                <Form.Item
+                  name="seed"
+                  label="随机种子"
+                  rules={[{ pattern: /^\d+$/, message: '请输入数字' }]}
+                >
+                  <InputNumber
+                    placeholder="随机种子"
+                    style={{ width: '100%' }}
+                    min={0}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="watermark"
+                  label="水印"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 隐藏的表单字段 */}
         <Form.Item name="image_url" hidden>

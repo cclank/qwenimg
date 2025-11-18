@@ -62,6 +62,15 @@ export const generationAPI = {
     return api.post('/generation/text-to-video', data);
   },
 
+  // 上传图片
+  uploadImage: (formData: FormData): Promise<{ url: string }> => {
+    return api.post('/upload/image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
   // 获取任务状态
   getTaskStatus: (taskId: string): Promise<Task> => {
     return api.get(`/generation/task/${taskId}`);
