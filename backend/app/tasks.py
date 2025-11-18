@@ -287,8 +287,26 @@ class TaskManager:
 
     def _image_to_video_sync(self, params: dict):
         """同步执行图生视频"""
+        # 转换图片URL路径为文件系统路径
+        image_url = params.get("image_url", "")
+        if image_url.startswith("/uploads/"):
+            # 将 /uploads/xxx.png 转换为 ./uploads/xxx.png
+            image_path = "." + image_url
+            logger.info(f"Converting image URL {image_url} to file path {image_path}")
+        elif image_url.startswith("http://") or image_url.startswith("https://"):
+            # 如果是完整URL，直接使用
+            image_path = image_url
+        else:
+            # 默认作为文件路径处理
+            image_path = image_url
+
+        # 验证文件是否存在（如果是本地文件）
+        if not (image_path.startswith("http://") or image_path.startswith("https://")):
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"Image file not found: {image_path}")
+
         return self.qwen_client.image_to_video(
-            image=params.get("image_url"),
+            image=image_path,
             prompt=params.get("prompt"),
             negative_prompt=params.get("negative_prompt"),
             resolution=params.get("resolution", "1080P"),

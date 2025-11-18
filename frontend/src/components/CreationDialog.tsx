@@ -221,6 +221,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                     setMediaMode('image');
                     setTaskType('text_to_image');
                     setImageUrl(''); // 清除图片
+                    form.setFieldValue('model', 'wan2.5-t2i-preview'); // 设置图片模型
                   }}
                 >
                   <PictureOutlined />
@@ -234,6 +235,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                     setMediaMode('video');
                     setTaskType('text_to_video');
                     setImageUrl(''); // 清除图片
+                    form.setFieldValue('model', 'wan2.5-t2v-preview'); // 设置视频模型
                   }}
                 >
                   <VideoCameraOutlined />
@@ -246,6 +248,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   onClick={() => {
                     setMediaMode('image_to_video');
                     setTaskType('image_to_video');
+                    form.setFieldValue('model', 'wan2.5-t2v-preview'); // 设置视频模型
                   }}
                 >
                   <div className="image-to-video-single-icon">
