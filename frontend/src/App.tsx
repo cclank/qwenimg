@@ -2,7 +2,7 @@
  * 主应用组件 - 简洁高级黑白灰设计
  */
 import React, { useState, useEffect } from 'react';
-import { Space, Button, Modal, Input, message, Typography, Dropdown, type MenuProps } from 'antd';
+import { Space, Button, Modal, Input, message, Typography, Dropdown, Image, type MenuProps } from 'antd';
 import {
   SettingOutlined,
   GithubOutlined,
@@ -26,6 +26,10 @@ type ViewMode = 'create' | 'history' | 'inspiration';
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('create');
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [videoPreview, setVideoPreview] = useState<{ visible: boolean; url: string; prompt?: string }>({
+    visible: false,
+    url: '',
+  });
   const apiKey = useAppStore((state) => state.apiKey);
   const setApiKey = useAppStore((state) => state.setApiKey);
   const sessionId = useAppStore((state) => state.sessionId);
@@ -213,60 +217,69 @@ function App() {
                 <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(33.333% - 21px)' }}>
                   {task.task_type === 'text_to_image' && task.result_urls && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {task.result_urls.map((url, index) => (
-                        <div
-                          key={index}
-                          style={{
-                            borderRadius: 'var(--radius-lg)',
-                            overflow: 'hidden',
-                            boxShadow: 'var(--shadow-sm)',
-                            transition: 'all 0.2s ease',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            width: '100%',
-                            height: '100%',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }}
-                        >
-                          <img
-                            src={url}
-                            alt={`Generated ${index}`}
+                      <Image.PreviewGroup>
+                        {task.result_urls.map((url, index) => (
+                          <div
+                            key={index}
                             style={{
+                              borderRadius: 'var(--radius-lg)',
+                              overflow: 'hidden',
+                              boxShadow: 'var(--shadow-sm)',
+                              transition: 'all 0.2s ease',
+                              position: 'relative',
                               width: '100%',
-                              height: 'auto',
-                              display: 'block',
-                              maxHeight: '450px',
-                              objectFit: 'cover',
+                              height: '100%',
                             }}
-                          />
-                          {task.prompt && (
-                            <div
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            <Image
+                              src={url}
+                              alt={`Generated ${index}`}
                               style={{
-                                position: 'absolute',
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                background: 'rgba(0, 0, 0, 0.7)',
-                                color: 'white',
-                                padding: '8px',
-                                fontSize: '12px',
-                                transform: 'translateY(100%)',
-                                transition: 'transform 0.2s ease',
+                                width: '100%',
+                                height: 'auto',
+                                display: 'block',
+                                maxHeight: '450px',
+                                objectFit: 'cover',
+                                cursor: 'pointer',
                               }}
-                              className="prompt-tooltip"
-                            >
-                              {task.prompt}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                              preview={{
+                                mask: (
+                                  <div style={{ fontSize: '14px' }}>
+                                    点击预览
+                                  </div>
+                                ),
+                              }}
+                            />
+                            {task.prompt && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  background: 'rgba(0, 0, 0, 0.7)',
+                                  color: 'white',
+                                  padding: '8px',
+                                  fontSize: '12px',
+                                  transform: 'translateY(100%)',
+                                  transition: 'transform 0.2s ease',
+                                }}
+                                className="prompt-tooltip"
+                              >
+                                {task.prompt}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </Image.PreviewGroup>
                     </div>
                   )}
                   {(task.task_type === 'text_to_video' || task.task_type === 'image_to_video') &&
@@ -282,6 +295,7 @@ function App() {
                           width: '100%',
                           height: '100%',
                         }}
+                        onClick={() => setVideoPreview({ visible: true, url: task.result_urls[0], prompt: task.prompt })}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
                           e.currentTarget.style.transform = 'translateY(-2px)';
@@ -293,15 +307,34 @@ function App() {
                       >
                         <video
                           src={task.result_urls[0]}
-                          controls
                           style={{
                             width: '100%',
                             height: 'auto',
                             display: 'block',
                             maxHeight: '450px',
                             objectFit: 'cover',
+                            pointerEvents: 'none',
                           }}
                         />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            color: 'white',
+                            padding: '12px 24px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: '14px',
+                            opacity: 0,
+                            transition: 'opacity 0.2s ease',
+                            pointerEvents: 'none',
+                          }}
+                          className="video-play-hint"
+                        >
+                          点击播放
+                        </div>
                         {task.prompt && (
                           <div
                             style={{
@@ -401,6 +434,32 @@ function App() {
             保存设置
           </Button>
         </Space>
+      </Modal>
+
+      {/* 视频预览对话框 */}
+      <Modal
+        title={videoPreview.prompt ? `视频预览 - ${videoPreview.prompt.slice(0, 50)}...` : '视频预览'}
+        open={videoPreview.visible}
+        onCancel={() => setVideoPreview({ visible: false, url: '' })}
+        footer={null}
+        centered
+        width="80%"
+        styles={{
+          mask: { backdropFilter: 'blur(8px)' },
+          body: { padding: 0 },
+        }}
+      >
+        <video
+          src={videoPreview.url}
+          controls
+          autoPlay
+          style={{
+            width: '100%',
+            height: 'auto',
+            display: 'block',
+            borderRadius: 'var(--radius-md)',
+          }}
+        />
       </Modal>
     </div>
   );
