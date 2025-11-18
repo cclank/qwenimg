@@ -113,6 +113,15 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
     }
   };
 
+  // 处理键盘事件：回车提交，Shift+回车换行
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.submit();
+    }
+    // Shift+Enter 自动换行，无需额外处理
+  };
+
   // 配置菜单选项
   const modelOptions: MenuProps['items'] = [
     { key: 'wan2.5-t2i-preview', label: 'Wan 2.5 Image' },
@@ -155,7 +164,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
               {/* 图片上传按钮 - 仅图生视频模式显示 */}
               {mediaMode === 'image_to_video' && (
                 <Form.Item name="image_upload" noStyle>
-                  <Tooltip title="上传参考图片用于图生视频" placement="right">
+                  <Tooltip title="上传图片" placement="right">
                     <Upload
                       accept="image/*"
                       beforeUpload={handleUpload as any}
@@ -186,7 +195,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
           {/* 右上角模式切换器 */}
           <div className="dialog-mode-selector-top-right">
             <div className="mode-toggle-icons">
-              <Tooltip title="文生图 - 使用文字描述生成图片" placement="top">
+              <Tooltip title="文生图" placement="top">
                 <button
                   type="button"
                   className={`mode-icon-btn ${mediaMode === 'image' ? 'active' : ''}`}
@@ -199,7 +208,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   <PictureOutlined />
                 </button>
               </Tooltip>
-              <Tooltip title="文生视频 - 使用文字描述生成视频" placement="top">
+              <Tooltip title="文生视频" placement="top">
                 <button
                   type="button"
                   className={`mode-icon-btn ${mediaMode === 'video' ? 'active' : ''}`}
@@ -212,7 +221,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   <VideoCameraOutlined />
                 </button>
               </Tooltip>
-              <Tooltip title="图生视频 - 上传图片生成动态视频" placement="top">
+              <Tooltip title="图生视频" placement="top">
                 <button
                   type="button"
                   className={`mode-icon-btn ${mediaMode === 'image_to_video' ? 'active' : ''}`}
@@ -252,6 +261,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                     : 'First upload an image, then describe how you want to transform it into a video...'
                 }
                 maxLength={2000}
+                onKeyDown={handleKeyDown}
               />
             </Form.Item>
           </div>
@@ -261,7 +271,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
         <div className="dialog-footer">
           {/* 左侧控制按钮 - 桌面端显示 */}
           <div className="dialog-controls">
-            <Tooltip title={`模型选择 - 当前: ${mediaMode === 'image' ? 'Wan 2.5 图像模型' : 'Wan 2.5 视频模型'}`} placement="top">
+            <Tooltip title="模型" placement="bottom">
               <Dropdown menu={{ items: modelOptions }} placement="topLeft">
                 <button type="button" className="control-select-btn">
                   <PictureOutlined />
@@ -283,7 +293,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                     ]}
                   />
                 </Form.Item>
-                <Tooltip title="图片尺寸比例 - 选择生成图片的宽高比" placement="top">
+                <Tooltip title="尺寸比例" placement="bottom">
                   <Dropdown menu={{ items: aspectRatioOptions }} placement="topLeft">
                     <button type="button" className="control-select-btn">
                       <div style={{
@@ -308,7 +318,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 <Form.Item name="n" noStyle>
                   <Select style={{ display: 'none' }} />
                 </Form.Item>
-                <Tooltip title="生成数量 - 一次生成多少张图片（1-4张）" placement="top">
+                <Tooltip title="生成数量" placement="bottom">
                   <Dropdown menu={{ items: numberOptions }} placement="topLeft">
                     <button type="button" className="control-select-btn">
                       <NumberOutlined />
@@ -321,7 +331,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
 
             {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
               <>
-                <Tooltip title="视频分辨率 - 选择生成视频的清晰度" placement="top">
+                <Tooltip title="分辨率" placement="bottom">
                   <Dropdown menu={{ items: [
                     { key: '480P', label: '480P', onClick: () => form.setFieldValue('resolution', '480P') },
                     { key: '720P', label: '720P', onClick: () => form.setFieldValue('resolution', '720P') },
@@ -334,7 +344,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   </Dropdown>
                 </Tooltip>
 
-                <Tooltip title="视频时长 - 选择生成视频的长度" placement="top">
+                <Tooltip title="时长" placement="bottom">
                   <Dropdown menu={{ items: [
                     { key: '5', label: '5秒', onClick: () => form.setFieldValue('duration', 5) },
                     { key: '10', label: '10秒', onClick: () => form.setFieldValue('duration', 10) },
@@ -367,7 +377,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
             )}
 
             {/* 高级配置按钮 */}
-            <Tooltip title="高级配置 - 设置负面提示词、随机种子等" placement="top">
+            <Tooltip title="高级选项" placement="bottom">
               <button
                 type="button"
                 className="control-select-btn"
@@ -381,7 +391,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
 
           {/* 右侧动作按钮 */}
           <div className="dialog-actions">
-            <Tooltip title={loading ? '生成中...' : '开始生成'} placement="top">
+            <Tooltip title={loading ? '生成中...' : '生成'} placement="bottom">
               <button
                 type="submit"
                 className="generate-btn"
