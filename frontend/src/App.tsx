@@ -202,7 +202,7 @@ function App() {
                 return timeB - timeA;
               })
               .map((task) => (
-                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(33.333% - 21px)' }}>
+                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
                   <LoadingCard task={task} />
                 </div>
               ))}
@@ -216,9 +216,8 @@ function App() {
                 const timeB = new Date(b.created_at || 0).getTime();
                 return timeB - timeA;
               })
-              .slice(0, 3)
               .map((task) => (
-                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(33.333% - 21px)' }}>
+                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
                   {task.task_type === 'text_to_image' && task.result_urls && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <Image.PreviewGroup>
@@ -245,7 +244,7 @@ function App() {
                           >
                             <Image
                               src={url}
-                              alt={`Generated ${index}`}
+                              alt={task.prompt || `Generated ${index}`}
                               style={{
                                 width: '100%',
                                 height: 'auto',
@@ -258,6 +257,28 @@ function App() {
                                 mask: (
                                   <div style={{ fontSize: '14px' }}>
                                     点击预览
+                                  </div>
+                                ),
+                                imageRender: (originalNode) => (
+                                  <div style={{ position: 'relative' }}>
+                                    {originalNode}
+                                    {task.prompt && (
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          bottom: 0,
+                                          left: 0,
+                                          right: 0,
+                                          background: 'rgba(0, 0, 0, 0.8)',
+                                          color: 'white',
+                                          padding: '16px 24px',
+                                          fontSize: '14px',
+                                          lineHeight: '1.6',
+                                        }}
+                                      >
+                                        <strong>提示词：</strong>{task.prompt}
+                                      </div>
+                                    )}
                                   </div>
                                 ),
                               }}
@@ -297,7 +318,8 @@ function App() {
                           position: 'relative',
                           cursor: 'pointer',
                           width: '100%',
-                          height: '100%',
+                          aspectRatio: '1',
+                          background: '#000',
                         }}
                         onClick={() => setVideoPreview({ visible: true, url: task.result_urls[0], prompt: task.prompt })}
                         onMouseEnter={(e) => {
@@ -313,10 +335,9 @@ function App() {
                           src={task.result_urls[0]}
                           style={{
                             width: '100%',
-                            height: 'auto',
+                            height: '100%',
                             display: 'block',
-                            maxHeight: '450px',
-                            objectFit: 'cover',
+                            objectFit: 'contain',
                             pointerEvents: 'none',
                           }}
                         />
@@ -442,7 +463,7 @@ function App() {
 
       {/* 视频预览对话框 */}
       <Modal
-        title={videoPreview.prompt ? `视频预览 - ${videoPreview.prompt.slice(0, 50)}...` : '视频预览'}
+        title="视频预览"
         open={videoPreview.visible}
         onCancel={() => setVideoPreview({ visible: false, url: '' })}
         footer={null}
@@ -453,17 +474,38 @@ function App() {
           body: { padding: 0 },
         }}
       >
-        <video
-          src={videoPreview.url}
-          controls
-          autoPlay
-          style={{
-            width: '100%',
-            height: 'auto',
-            display: 'block',
-            borderRadius: 'var(--radius-md)',
-          }}
-        />
+        <div style={{ position: 'relative' }}>
+          <video
+            src={videoPreview.url}
+            controls
+            autoPlay
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              borderRadius: 'var(--radius-md)',
+            }}
+          />
+          {videoPreview.prompt && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: 'rgba(0, 0, 0, 0.8)',
+                color: 'white',
+                padding: '16px 24px',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                borderBottomLeftRadius: 'var(--radius-md)',
+                borderBottomRightRadius: 'var(--radius-md)',
+              }}
+            >
+              <strong>提示词：</strong>{videoPreview.prompt}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

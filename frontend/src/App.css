@@ -411,9 +411,9 @@
 
 .results-masonry {
   display: flex;
-  gap: 32px;
-  justify-content: center;
-  flex-wrap: nowrap;
+  gap: 20px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   width: 100%;
   margin-top: 20px;
 }
@@ -427,9 +427,15 @@
   transform: translateY(0);
 }
 
+@media (max-width: 1400px) {
+  .results-masonry > div {
+    width: calc(25% - 15px) !important;
+  }
+}
+
 @media (max-width: 1024px) {
   .results-masonry {
-    gap: 24px;
+    gap: 16px;
   }
 
   .app-main {
@@ -437,7 +443,13 @@
   }
 
   .results-masonry > div {
-    width: calc(33.333% - 16px) !important;
+    width: calc(33.333% - 11px) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .results-masonry > div {
+    width: calc(50% - 8px) !important;
   }
 }
 
