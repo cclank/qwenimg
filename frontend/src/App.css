@@ -458,6 +458,16 @@
   }
 }
 
+/* ===== 视频播放提示 ===== */
+.video-play-hint {
+  pointer-events: none;
+}
+
+/* 视频容器悬停时显示播放提示 */
+.results-masonry > div > div:hover .video-play-hint {
+  opacity: 1 !important;
+}
+
 /* ===== 任务面板 ===== */
 .tasks-panel {
   position: fixed;
