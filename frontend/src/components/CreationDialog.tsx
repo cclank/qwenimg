@@ -179,11 +179,29 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                           aspectRatio: '1.72',
                           border: `2px dashed ${imageUrl ? 'var(--color-primary)' : 'var(--color-border)'}`,
                           borderRadius: 'var(--radius-md)',
-                          background: imageUrl ? 'var(--color-gray-50)' : 'transparent'
+                          background: imageUrl ? 'var(--color-gray-50)' : 'transparent',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          padding: imageUrl ? '0' : '8px',
                         }}
                       >
-                        <PictureOutlined />
-                        <span>{imageUrl ? '已上传' : '上传图片'}</span>
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt="Uploaded"
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <PictureOutlined />
+                            <span>上传图片</span>
+                          </>
+                        )}
                       </button>
                     </Upload>
                   </Tooltip>
