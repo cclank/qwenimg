@@ -7,7 +7,7 @@ import os
 import logging
 
 from .database import init_db
-from .api import generation, websocket, inspiration
+from .api import generation, websocket, inspiration, upload
 
 # 配置日志
 logging.basicConfig(
@@ -38,11 +38,17 @@ app.add_middleware(
 app.include_router(generation.router)
 app.include_router(inspiration.router)
 app.include_router(websocket.router)
+app.include_router(upload.router)
 
 # 静态文件服务（用于保存生成的图片）
 if not os.path.exists("./outputs"):
     os.makedirs("./outputs")
 app.mount("/outputs", StaticFiles(directory="./outputs"), name="outputs")
+
+# 上传文件服务
+if not os.path.exists("./uploads"):
+    os.makedirs("./uploads")
+app.mount("/uploads", StaticFiles(directory="./uploads"), name="uploads")
 
 # 前端静态文件（生产环境）
 if os.path.exists("../frontend/dist"):
