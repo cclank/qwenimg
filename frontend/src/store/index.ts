@@ -21,6 +21,19 @@ const getStoredApiKey = () => {
   return '';
 };
 
+// 安全获取或生成session_id
+const getOrGenerateSessionId = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    let sessionId = localStorage.getItem('session_id');
+    if (!sessionId) {
+      sessionId = generateUUID();
+      localStorage.setItem('session_id', sessionId);
+    }
+    return sessionId;
+  }
+  return generateUUID();
+};
+
 interface AppState {
   // 会话ID
   sessionId: string;
@@ -46,7 +59,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   // 初始状态
-  sessionId: generateUUID(),
+  sessionId: getOrGenerateSessionId(),
   tasks: [],
   activeTab: 'text_to_image',
   apiKey: getStoredApiKey(),
@@ -54,11 +67,25 @@ export const useAppStore = create<AppState>((set) => ({
   // 设置会话ID
   setSessionId: (sessionId) => set({ sessionId }),
 
-  // 添加任务
+  // 添加任务（避免重复）
   addTask: (task) =>
-    set((state) => ({
-      tasks: [task, ...state.tasks],
-    })),
+    set((state) => {
+      // 检查任务是否已存在
+      const taskExists = state.tasks.some(t => t.task_id === task.task_id);
+      if (taskExists) {
+        // 如果任务已存在，更新而不是添加
+        return {
+          tasks: state.tasks.map((t) =>
+            t.task_id === task.task_id ? { ...t, ...task } : t
+          ),
+        };
+      } else {
+        // 如果任务不存在，添加到开头
+        return {
+          tasks: [task, ...state.tasks],
+        };
+      }
+    }),
 
   // 更新任务
   updateTask: (taskId, updates) =>

@@ -25,11 +25,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete }) => {
   const getStatusTag = () => {
     switch (task.status) {
       case 'pending':
-        return (
-          <Tag icon={<ClockCircleOutlined />} color="default">
-            等待中
-          </Tag>
-        );
       case 'running':
         return (
           <Tag icon={<LoadingOutlined />} color="processing">
@@ -164,8 +159,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete }) => {
                   <video
                     src={url}
                     controls
+                    autoPlay
+                    muted
+                    playsInline
+                    preload="auto"
                     style={{ width: '100%', maxHeight: 300, borderRadius: 4 }}
-                  />
+                    onError={(e) => console.error('Video load error:', e)}
+                  >
+                    <source src={url} type="video/mp4" />
+                    您的浏览器不支持视频播放。请尝试<a href={url} download>下载视频</a>。
+                  </video>
                   <Button
                     icon={<DownloadOutlined />}
                     onClick={() => handleDownload(url, index)}

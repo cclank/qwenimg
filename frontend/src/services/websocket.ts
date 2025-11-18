@@ -91,12 +91,13 @@ class WebSocketService {
   private handleMessage(event: MessageEvent) {
     try {
       const message: WSMessage = JSON.parse(event.data);
-      console.log('WebSocket message:', message);
+      console.log('WebSocket message received:', message);
 
       // 通知所有订阅者
       this.messageHandlers.forEach((handler) => handler(message));
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error);
+      console.log('Raw message data:', event.data);
     }
   }
 
@@ -113,10 +114,14 @@ class WebSocketService {
   private handleClose() {
     console.log('WebSocket disconnected');
 
+    // 清理心跳定时器
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
+
+    // 清理WebSocket引用
+    this.ws = null;
 
     // 尝试重连
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -128,7 +133,30 @@ class WebSocketService {
       }, this.reconnectDelay);
     } else {
       console.error('Max reconnect attempts reached');
+      // 通知所有订阅者连接已断开
+      this.messageHandlers.forEach((handler) =>
+        handler({
+          type: 'disconnected',
+          message: 'WebSocket连接已断开，达到最大重连次数'
+        } as any)
+      );
     }
+  }
+
+  /**
+   * 获取当前session_id
+   */
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  /**
+   * 重新设置session_id并重连
+   */
+  reconnectWithSessionId(sessionId: string) {
+    this.sessionId = sessionId;
+    this.reconnectAttempts = 0;
+    this.connect();
   }
 
   /**

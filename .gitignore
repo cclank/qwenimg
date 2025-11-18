@@ -49,6 +49,10 @@ outputs/
 *.mov
 *.avi
 
+# Database
+*.db
+*.db-*
+
 # Testing
 .pytest_cache/
 .coverage
@@ -64,3 +68,6 @@ build/
 
 # Logs
 *.log
+
+# Streamlit cache
+.streamlit_cache/

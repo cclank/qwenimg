@@ -1,7 +1,7 @@
 /**
  * 主应用组件
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layout,
   Menu,
@@ -16,7 +16,7 @@ import {
 } from 'antd';
 import {
   PictureOutlined,
-  VideoOutlined,
+  VideoCameraOutlined,
   PlayCircleOutlined,
   HistoryOutlined,
   BulbOutlined,
@@ -43,9 +43,42 @@ function App() {
   const apiKey = useAppStore((state) => state.apiKey);
   const setApiKey = useAppStore((state) => state.setApiKey);
   const sessionId = useAppStore((state) => state.sessionId);
+  const addTask = useAppStore((state) => state.addTask);
 
   // 初始化WebSocket
   useWebSocket();
+
+  // 页面加载时获取历史任务
+  useEffect(() => {
+    const fetchHistoryTasks = async () => {
+      try {
+        const response = await fetch(`/api/generation/tasks?session_id=${sessionId}&page_size=20`);
+        if (response.ok) {
+          const data = await response.json();
+          // 将历史任务添加到状态中（避免重复添加）
+          data.tasks.forEach((task: any) => {
+            // 检查任务是否已存在
+            // 注意：这里简化处理，实际应该检查任务ID是否已存在
+            addTask({
+              task_id: task.task_id,
+              task_type: task.task_type,
+              status: task.status,
+              progress: task.progress,
+              prompt: task.prompt,
+              result_urls: task.result_urls,
+              error_message: task.error_message,
+              created_at: task.created_at,
+              completed_at: task.completed_at,
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch history tasks:', error);
+      }
+    };
+
+    fetchHistoryTasks();
+  }, [sessionId, addTask]);
 
   const handleSaveSettings = (key: string) => {
     setApiKey(key);
@@ -147,7 +180,7 @@ function App() {
                   },
                   {
                     key: 'image_to_video',
-                    icon: <VideoOutlined />,
+                    icon: <VideoCameraOutlined />,
                     label: '图生视频',
                   },
                   {

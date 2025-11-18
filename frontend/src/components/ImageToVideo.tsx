@@ -18,7 +18,7 @@ import {
 } from 'antd';
 import {
   ThunderboltOutlined,
-  VideoOutlined,
+  VideoCameraOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -56,6 +56,7 @@ export const ImageToVideo: React.FC = () => {
 
     try {
       setLoading(true);
+      console.log('Submitting image to video task with session_id:', sessionId);
 
       const request: ImageToVideoRequest = {
         ...values,
@@ -64,6 +65,7 @@ export const ImageToVideo: React.FC = () => {
       };
 
       const response = await generationAPI.imageToVideo(request);
+      console.log('Task created successfully:', response);
 
       addTask({
         task_id: response.task_id,
@@ -75,6 +77,7 @@ export const ImageToVideo: React.FC = () => {
 
       message.success('任务已创建，正在生成中...');
     } catch (error: any) {
+      console.error('Failed to create task:', error);
       message.error(error.response?.data?.detail || '创建任务失败');
     } finally {
       setLoading(false);
@@ -85,7 +88,7 @@ export const ImageToVideo: React.FC = () => {
     <Card
       title={
         <Space>
-          <VideoOutlined />
+          <VideoCameraOutlined />
           <span>图生视频</span>
         </Space>
       }

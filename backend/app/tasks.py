@@ -6,6 +6,9 @@ from typing import Dict, Optional, Callable, Any
 from concurrent.futures import ThreadPoolExecutor
 import sys
 import os
+from PIL import Image
+import io
+import base64
 
 # 添加父目录到路径以导入qwenimg
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../'))
@@ -35,8 +38,17 @@ class ConnectionManager:
     def disconnect(self, session_id: str):
         """断开连接"""
         if session_id in self.active_connections:
-            del self.active_connections[session_id]
-            logger.info(f"WebSocket disconnected: {session_id}")
+            try:
+                # 关闭WebSocket连接
+                websocket = self.active_connections[session_id]
+                if hasattr(websocket, 'close'):
+                    websocket.close()
+            except Exception as e:
+                logger.error(f"Failed to close WebSocket for {session_id}: {e}")
+            finally:
+                # 从活动连接中移除
+                del self.active_connections[session_id]
+                logger.info(f"WebSocket disconnected: {session_id}")
 
     async def send_message(self, session_id: str, message: dict):
         """发送消息到指定会话"""
@@ -82,14 +94,16 @@ class TaskManager:
 
                 # 通过WebSocket发送进度更新
                 if task.session_id:
-                    await manager.send_message(task.session_id, {
+                    message = {
                         "type": "progress",
                         "task_id": task_id,
                         "data": {
                             "progress": progress,
                             "status": status
                         }
-                    })
+                    }
+                    print(f"Sending progress update: {message}")  # 调试信息
+                    await manager.send_message(task.session_id, message)
         except Exception as e:
             logger.error(f"Failed to update task progress: {e}")
         finally:
@@ -121,6 +135,7 @@ class TaskManager:
                             "error_message": error_message
                         }
                     }
+                    print(f"Sending task completion: {message}")  # 调试信息
                     await manager.send_message(task.session_id, message)
         except Exception as e:
             logger.error(f"Failed to complete task: {e}")
@@ -147,15 +162,39 @@ class TaskManager:
 
             # 处理结果（URL列表）
             result_urls = []
+            # 确保outputs目录存在
+            output_dir = "./outputs"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
             if isinstance(result, list):
                 # 多张图片
                 for i, img in enumerate(result):
-                    # TODO: 将图片上传到云存储或保存到本地，返回URL
-                    # 这里暂时使用占位符
-                    result_urls.append(f"/api/results/{task_id}_{i}.png")
+                    # 保存图片到本地
+                    if isinstance(img, Image.Image):
+                        filename = f"{task_id}_{i}.png"
+                        filepath = os.path.join(output_dir, filename)
+                        img.save(filepath)
+                        result_urls.append(f"/outputs/{filename}")
+                    else:
+                        # 如果不是PIL图像，假设是base64编码
+                        filename = f"{task_id}_{i}.png"
+                        filepath = os.path.join(output_dir, filename)
+                        # 解码base64并保存
+                        with open(filepath, "wb") as f:
+                            f.write(base64.b64decode(img))
+                        result_urls.append(f"/outputs/{filename}")
             else:
                 # 单张图片
-                result_urls.append(f"/api/results/{task_id}_0.png")
+                filename = f"{task_id}_0.png"
+                filepath = os.path.join(output_dir, filename)
+                if isinstance(result, Image.Image):
+                    result.save(filepath)
+                else:
+                    # 如果不是PIL图像，假设是base64编码
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(result))
+                result_urls.append(f"/outputs/{filename}")
 
             await self.complete_task(task_id, result_urls)
 
@@ -186,13 +225,32 @@ class TaskManager:
             loop = asyncio.get_event_loop()
             await self.update_task_progress(task_id, 30.0, "running")
 
-            result_url = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 executor,
                 self._image_to_video_sync,
                 params
             )
 
             await self.update_task_progress(task_id, 90.0, "running")
+
+            # 确保outputs目录存在
+            output_dir = "./outputs"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            # 保存视频到本地并返回URL
+            filename = f"{task_id}.mp4"
+            filepath = os.path.join(output_dir, filename)
+            # 如果result是文件路径，复制文件
+            if isinstance(result, str) and os.path.exists(result):
+                import shutil
+                shutil.copy(result, filepath)
+            # 如果result是base64编码，解码保存
+            elif isinstance(result, str):
+                with open(filepath, "wb") as f:
+                    f.write(base64.b64decode(result))
+
+            result_url = f"/outputs/{filename}"
             await self.complete_task(task_id, [result_url])
 
         except Exception as e:
@@ -221,17 +279,104 @@ class TaskManager:
             loop = asyncio.get_event_loop()
             await self.update_task_progress(task_id, 30.0, "running")
 
-            result_url = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 executor,
                 self._text_to_video_sync,
                 params
             )
 
             await self.update_task_progress(task_id, 90.0, "running")
+
+            # 确保outputs目录存在
+            output_dir = "./outputs"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            # 保存视频到本地并返回URL
+            filename = f"{task_id}.mp4"
+            filepath = os.path.join(output_dir, filename)
+
+            # 处理不同的返回格式
+            if result is None:
+                raise ValueError("Text to video task returned None")
+
+            # 如果result是URL，下载视频内容
+            if isinstance(result, str) and (result.startswith("http://") or result.startswith("https://")):
+                logger.info(f"Downloading video from URL: {result}")
+                try:
+                    import requests
+                    response = requests.get(result, timeout=30)
+                    response.raise_for_status()
+
+                    with open(filepath, "wb") as f:
+                        f.write(response.content)
+                    logger.info(f"Downloaded video from {result} to {filepath}")
+                except Exception as e:
+                    logger.error(f"Failed to download video from {result}: {e}")
+                    # 如果下载失败，保存错误信息到文件
+                    with open(filepath, "w") as f:
+                        f.write(f"Error downloading video: {str(e)}\nURL: {result}")
+                    raise ValueError(f"Failed to download video: {e}")
+            # 如果result是文件路径，复制文件
+            elif isinstance(result, str) and os.path.exists(result):
+                import shutil
+                shutil.copy(result, filepath)
+                logger.info(f"Copied video file from {result} to {filepath}")
+            # 如果result是base64编码，解码保存
+            elif isinstance(result, str):
+                # 检查是否是base64数据URI
+                if result.startswith("data:video"):
+                    # 提取base64部分
+                    base64_data = result.split(",")[1]
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(base64_data))
+                else:
+                    # 直接是base64编码
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(result))
+                logger.info(f"Saved base64 video to {filepath}")
+            else:
+                # 如果是字典格式，提取视频数据
+                if isinstance(result, dict) and "video" in result:
+                    video_data = result["video"]
+                    if isinstance(video_data, str):
+                        # 检查是否是URL
+                        if video_data.startswith("http://") or video_data.startswith("https://"):
+                            logger.info(f"Downloading video from URL: {video_data}")
+                            try:
+                                import requests
+                                response = requests.get(video_data, timeout=30)
+                                response.raise_for_status()
+
+                                with open(filepath, "wb") as f:
+                                    f.write(response.content)
+                                logger.info(f"Downloaded video from {video_data} to {filepath}")
+                            except Exception as e:
+                                logger.error(f"Failed to download video from {video_data}: {e}")
+                                # 如果下载失败，保存错误信息到文件
+                                with open(filepath, "w") as f:
+                                    f.write(f"Error downloading video: {str(e)}\nURL: {video_data}")
+                                raise ValueError(f"Failed to download video: {e}")
+                        # 检查是否是base64数据URI
+                        elif video_data.startswith("data:video"):
+                            base64_data = video_data.split(",")[1]
+                            with open(filepath, "wb") as f:
+                                f.write(base64.b64decode(base64_data))
+                        else:
+                            with open(filepath, "wb") as f:
+                                f.write(base64.b64decode(video_data))
+                        logger.info(f"Saved dict video to {filepath}")
+                    else:
+                        raise ValueError(f"Unexpected video data type: {type(video_data)}")
+                else:
+                    raise ValueError(f"Unexpected result format: {type(result)}")
+
+            result_url = f"/outputs/{filename}"
+            logger.info(f"Video saved successfully: {result_url}")
             await self.complete_task(task_id, [result_url])
 
         except Exception as e:
-            logger.error(f"Text to video task failed: {e}")
+            logger.error(f"Text to video task failed: {e}", exc_info=True)
             await self.complete_task(task_id, [], str(e))
 
     def _text_to_video_sync(self, params: dict):
