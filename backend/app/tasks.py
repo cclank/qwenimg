@@ -231,7 +231,7 @@ class TaskManager:
                 params
             )
 
-            await self.update_task_progress(task_id, 90.0, "running")
+            await self.update_task_progress(task_id, 60.0, "running")
 
             # 确保outputs目录存在
             output_dir = "./outputs"
@@ -241,20 +241,48 @@ class TaskManager:
             # 保存视频到本地并返回URL
             filename = f"{task_id}.mp4"
             filepath = os.path.join(output_dir, filename)
+
+            # 如果result是URL，下载视频内容
+            if isinstance(result, str) and (result.startswith("http://") or result.startswith("https://")):
+                logger.info(f"Video URL received: {result}")
+                await self.update_task_progress(task_id, 70.0, "running")
+
+                # 在线程池中下载（避免阻塞事件循环）
+                await loop.run_in_executor(
+                    executor,
+                    self._download_video,
+                    result,
+                    filepath
+                )
+
+                await self.update_task_progress(task_id, 95.0, "running")
             # 如果result是文件路径，复制文件
-            if isinstance(result, str) and os.path.exists(result):
+            elif isinstance(result, str) and os.path.exists(result):
                 import shutil
                 shutil.copy(result, filepath)
+                logger.info(f"Copied video file from {result} to {filepath}")
             # 如果result是base64编码，解码保存
             elif isinstance(result, str):
-                with open(filepath, "wb") as f:
-                    f.write(base64.b64decode(result))
+                # 检查是否是base64数据URI
+                if result.startswith("data:video"):
+                    # 提取base64部分
+                    base64_data = result.split(",")[1]
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(base64_data))
+                else:
+                    # 直接是base64编码
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(result))
+                logger.info(f"Saved base64 video to {filepath}")
+            else:
+                raise ValueError(f"Unexpected result format: {type(result)}")
 
             result_url = f"/outputs/{filename}"
+            logger.info(f"Video saved successfully: {result_url}")
             await self.complete_task(task_id, [result_url])
 
         except Exception as e:
-            logger.error(f"Image to video task failed: {e}")
+            logger.error(f"Image to video task failed: {e}", exc_info=True)
             await self.complete_task(task_id, [], str(e))
 
     def _image_to_video_sync(self, params: dict):
@@ -269,6 +297,48 @@ class TaskManager:
             seed=params.get("seed"),
             watermark=params.get("watermark", False)
         )
+
+    def _download_video(self, url: str, filepath: str) -> None:
+        """下载视频文件（使用流式下载）"""
+        import requests
+
+        logger.info(f"Starting video download from: {url}")
+
+        # 使用流式下载，超时时间设置为(连接超时, 读取超时)
+        response = requests.get(url, stream=True, timeout=(10, 300))
+        response.raise_for_status()
+
+        # 检查Content-Type
+        content_type = response.headers.get('Content-Type', '')
+        logger.info(f"Content-Type: {content_type}")
+
+        # 获取文件大小
+        total_size = int(response.headers.get('content-length', 0))
+        logger.info(f"Total size: {total_size} bytes ({total_size / 1024 / 1024:.2f} MB)")
+
+        # 流式下载，分块写入文件
+        downloaded_size = 0
+        chunk_size = 8192  # 8KB per chunk
+
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=chunk_size):
+                if chunk:
+                    f.write(chunk)
+                    downloaded_size += len(chunk)
+
+                    # 每下载10MB打印一次进度
+                    if downloaded_size % (10 * 1024 * 1024) < chunk_size:
+                        logger.info(f"Downloaded {downloaded_size / 1024 / 1024:.2f} MB...")
+
+        # 验证下载是否完整
+        actual_size = os.path.getsize(filepath)
+        logger.info(f"Download completed. File size: {actual_size} bytes ({actual_size / 1024 / 1024:.2f} MB)")
+
+        if total_size > 0 and actual_size < total_size:
+            raise ValueError(f"Download incomplete: expected {total_size} bytes, got {actual_size} bytes")
+
+        if actual_size < 1000:  # 小于1KB可能是错误页面
+            raise ValueError(f"Downloaded file too small ({actual_size} bytes), likely an error response")
 
     async def run_text_to_video(self, task_id: str, params: dict):
         """执行文生视频任务"""
@@ -285,7 +355,7 @@ class TaskManager:
                 params
             )
 
-            await self.update_task_progress(task_id, 90.0, "running")
+            await self.update_task_progress(task_id, 60.0, "running")
 
             # 确保outputs目录存在
             output_dir = "./outputs"
@@ -302,21 +372,18 @@ class TaskManager:
 
             # 如果result是URL，下载视频内容
             if isinstance(result, str) and (result.startswith("http://") or result.startswith("https://")):
-                logger.info(f"Downloading video from URL: {result}")
-                try:
-                    import requests
-                    response = requests.get(result, timeout=30)
-                    response.raise_for_status()
+                logger.info(f"Video URL received: {result}")
+                await self.update_task_progress(task_id, 70.0, "running")
 
-                    with open(filepath, "wb") as f:
-                        f.write(response.content)
-                    logger.info(f"Downloaded video from {result} to {filepath}")
-                except Exception as e:
-                    logger.error(f"Failed to download video from {result}: {e}")
-                    # 如果下载失败，保存错误信息到文件
-                    with open(filepath, "w") as f:
-                        f.write(f"Error downloading video: {str(e)}\nURL: {result}")
-                    raise ValueError(f"Failed to download video: {e}")
+                # 在线程池中下载（避免阻塞事件循环）
+                await loop.run_in_executor(
+                    executor,
+                    self._download_video,
+                    result,
+                    filepath
+                )
+
+                await self.update_task_progress(task_id, 95.0, "running")
             # 如果result是文件路径，复制文件
             elif isinstance(result, str) and os.path.exists(result):
                 import shutil
@@ -342,21 +409,18 @@ class TaskManager:
                     if isinstance(video_data, str):
                         # 检查是否是URL
                         if video_data.startswith("http://") or video_data.startswith("https://"):
-                            logger.info(f"Downloading video from URL: {video_data}")
-                            try:
-                                import requests
-                                response = requests.get(video_data, timeout=30)
-                                response.raise_for_status()
+                            logger.info(f"Video URL in dict format: {video_data}")
+                            await self.update_task_progress(task_id, 70.0, "running")
 
-                                with open(filepath, "wb") as f:
-                                    f.write(response.content)
-                                logger.info(f"Downloaded video from {video_data} to {filepath}")
-                            except Exception as e:
-                                logger.error(f"Failed to download video from {video_data}: {e}")
-                                # 如果下载失败，保存错误信息到文件
-                                with open(filepath, "w") as f:
-                                    f.write(f"Error downloading video: {str(e)}\nURL: {video_data}")
-                                raise ValueError(f"Failed to download video: {e}")
+                            # 使用统一的下载函数
+                            await loop.run_in_executor(
+                                executor,
+                                self._download_video,
+                                video_data,
+                                filepath
+                            )
+
+                            await self.update_task_progress(task_id, 95.0, "running")
                         # 检查是否是base64数据URI
                         elif video_data.startswith("data:video"):
                             base64_data = video_data.split(",")[1]
