@@ -1,49 +1,35 @@
 /**
- * 主应用组件
+ * 主应用组件 - 简洁高级黑白灰设计
  */
 import React, { useState, useEffect } from 'react';
+import { Space, Button, Modal, Input, message, Typography, Dropdown, type MenuProps } from 'antd';
 import {
-  Layout,
-  Menu,
-  Typography,
-  Space,
-  Button,
-  Modal,
-  Input,
-  message,
-  Row,
-  Col,
-} from 'antd';
-import {
-  PictureOutlined,
-  VideoCameraOutlined,
-  PlayCircleOutlined,
-  HistoryOutlined,
-  BulbOutlined,
   SettingOutlined,
   GithubOutlined,
+  HistoryOutlined,
+  BulbOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
-import { TextToImage } from './components/TextToImage';
-import { ImageToVideo } from './components/ImageToVideo';
-import { TextToVideo } from './components/TextToVideo';
+import { CreationDialog } from './components/CreationDialog';
+import { ActiveTasksPanel } from './components/ActiveTasksPanel';
 import { History } from './components/History';
 import { Inspiration } from './components/Inspiration';
-import { ActiveTasksPanel } from './components/ActiveTasksPanel';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAppStore } from './store';
 import './App.css';
 
-const { Header, Content, Sider } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
+
+type ViewMode = 'create' | 'history' | 'inspiration';
 
 function App() {
-  const [activeKey, setActiveKey] = useState('text_to_image');
+  const [viewMode, setViewMode] = useState<ViewMode>('create');
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const apiKey = useAppStore((state) => state.apiKey);
   const setApiKey = useAppStore((state) => state.setApiKey);
   const sessionId = useAppStore((state) => state.sessionId);
   const addTask = useAppStore((state) => state.addTask);
+  const tasks = useAppStore((state) => state.tasks);
 
   // 初始化WebSocket
   useWebSocket();
@@ -55,10 +41,7 @@ function App() {
         const response = await fetch(`/api/generation/tasks?session_id=${sessionId}&page_size=20`);
         if (response.ok) {
           const data = await response.json();
-          // 将历史任务添加到状态中（避免重复添加）
           data.tasks.forEach((task: any) => {
-            // 检查任务是否已存在
-            // 注意：这里简化处理，实际应该检查任务ID是否已存在
             addTask({
               task_id: task.task_id,
               task_type: task.task_type,
@@ -86,148 +69,161 @@ function App() {
     message.success('设置已保存');
   };
 
-  const renderContent = () => {
-    switch (activeKey) {
-      case 'text_to_image':
-        return <TextToImage />;
-      case 'image_to_video':
-        return <ImageToVideo />;
-      case 'text_to_video':
-        return <TextToVideo />;
-      case 'history':
-        return <History />;
-      case 'inspiration':
-        return <Inspiration />;
-      default:
-        return <TextToImage />;
-    }
-  };
+  // 导航菜单
+  const navMenuItems: MenuProps['items'] = [
+    {
+      key: 'create',
+      label: '创作',
+      onClick: () => setViewMode('create'),
+    },
+    {
+      key: 'history',
+      label: '历史',
+      icon: <HistoryOutlined />,
+      onClick: () => setViewMode('history'),
+    },
+    {
+      key: 'inspiration',
+      label: '灵感',
+      icon: <BulbOutlined />,
+      onClick: () => setViewMode('inspiration'),
+    },
+  ];
+
+  // 获取进行中的任务数量
+  const activeTasks = tasks.filter(
+    (task) => task.status === 'pending' || task.status === 'running'
+  );
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {/* 顶部导航 */}
-      <Header
-        style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '0 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Space size="large">
-          <Title
-            level={3}
-            style={{
-              margin: 0,
-              color: '#fff',
-              fontWeight: 'bold',
-              letterSpacing: 1,
-            }}
-          >
-            QwenImg AI 创作平台
-          </Title>
-          <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
-            阿里云通义万相多模态AI
-          </Text>
-        </Space>
+    <div className="app-container">
+      {/* 页面头部 */}
+      <header className="app-header">
+        <div className="app-logo">
+          <div className="app-logo-icon">Q</div>
+          <span className="app-logo-text">QwenImg</span>
+        </div>
 
-        <Space>
+        <Space size="middle" className="app-nav">
+          <Dropdown menu={{ items: navMenuItems }} placement="bottomRight">
+            <Button
+              type="text"
+              style={{
+                color: 'var(--color-text-secondary)',
+                fontWeight: 500,
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              {viewMode === 'create' && '创作'}
+              {viewMode === 'history' && '历史'}
+              {viewMode === 'inspiration' && '灵感'}
+            </Button>
+          </Dropdown>
+
           <Button
             type="text"
             icon={<SettingOutlined />}
             onClick={() => setSettingsVisible(true)}
-            style={{ color: '#fff' }}
+            style={{
+              color: 'var(--color-text-secondary)',
+              borderRadius: 'var(--radius-md)',
+            }}
           >
             设置
           </Button>
+
           <Button
             type="text"
             icon={<GithubOutlined />}
             href="https://github.com/cclank/qwenimg"
             target="_blank"
-            style={{ color: '#fff' }}
+            style={{
+              color: 'var(--color-text-secondary)',
+              borderRadius: 'var(--radius-md)',
+            }}
           >
             GitHub
           </Button>
         </Space>
-      </Header>
+      </header>
 
-      <Layout>
-        {/* 左侧菜单 */}
-        <Sider
-          collapsible
-          collapsed={collapsed}
-          onCollapse={setCollapsed}
-          width={200}
-          style={{ background: '#fff' }}
-        >
-          <Menu
-            mode="inline"
-            selectedKeys={[activeKey]}
-            onClick={({ key }) => setActiveKey(key)}
-            style={{ height: '100%', borderRight: 0 }}
-            items={[
-              {
-                key: 'generation',
-                label: '创作工具',
-                type: 'group',
-                children: [
-                  {
-                    key: 'text_to_image',
-                    icon: <PictureOutlined />,
-                    label: '文生图',
-                  },
-                  {
-                    key: 'image_to_video',
-                    icon: <VideoCameraOutlined />,
-                    label: '图生视频',
-                  },
-                  {
-                    key: 'text_to_video',
-                    icon: <PlayCircleOutlined />,
-                    label: '文生视频',
-                  },
-                ],
-              },
-              {
-                key: 'manage',
-                label: '管理',
-                type: 'group',
-                children: [
-                  {
-                    key: 'history',
-                    icon: <HistoryOutlined />,
-                    label: '历史记录',
-                  },
-                  {
-                    key: 'inspiration',
-                    icon: <BulbOutlined />,
-                    label: '灵感画廊',
-                  },
-                ],
-              },
-            ]}
-          />
-        </Sider>
+      {/* 主内容区域 */}
+      <main className="app-main">
+        {viewMode === 'create' && <CreationDialog />}
+        {viewMode === 'history' && <History />}
+        {viewMode === 'inspiration' && <Inspiration />}
 
-        {/* 主内容区 */}
-        <Layout style={{ padding: '24px' }}>
-          <Content>
-            <Row gutter={24}>
-              {/* 左侧主区域 */}
-              <Col xs={24} xl={16}>
-                {renderContent()}
-              </Col>
+        {/* 结果展示区域 */}
+        {viewMode === 'create' && (
+          <div className="results-masonry">
+            {tasks
+              .filter((task) => task.status === 'completed')
+              .slice(0, 12)
+              .map((task) => (
+                <div key={task.task_id} style={{ breakInside: 'avoid', marginBottom: '16px' }}>
+                  {task.task_type === 'text_to_image' && task.result_urls && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {task.result_urls.map((url, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            borderRadius: 'var(--radius-lg)',
+                            overflow: 'hidden',
+                            boxShadow: 'var(--shadow-sm)',
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          <img
+                            src={url}
+                            alt={`Generated ${index}`}
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              display: 'block',
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(task.task_type === 'text_to_video' || task.task_type === 'image_to_video') &&
+                    task.result_urls && (
+                      <div
+                        style={{
+                          borderRadius: 'var(--radius-lg)',
+                          overflow: 'hidden',
+                          boxShadow: 'var(--shadow-sm)',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <video
+                          src={task.result_urls[0]}
+                          controls
+                          style={{
+                            width: '100%',
+                            height: 'auto',
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                    )}
+                </div>
+              ))}
+          </div>
+        )}
+      </main>
 
-              {/* 右侧任务面板 */}
-              <Col xs={24} xl={8}>
-                <ActiveTasksPanel />
-              </Col>
-            </Row>
-          </Content>
-        </Layout>
-      </Layout>
+      {/* 任务面板 - 仅在有活动任务时显示 */}
+      {activeTasks.length > 0 && <ActiveTasksPanel />}
 
       {/* 设置对话框 */}
       <Modal
@@ -235,17 +231,21 @@ function App() {
         open={settingsVisible}
         onCancel={() => setSettingsVisible(false)}
         footer={null}
+        centered
+        styles={{
+          mask: { backdropFilter: 'blur(4px)' },
+        }}
       >
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space direction="vertical" style={{ width: '100%', padding: '16px 0' }} size="large">
           <div>
-            <Text strong>DashScope API Key</Text>
+            <Text strong style={{ color: 'var(--color-text-primary)' }}>
+              DashScope API Key
+            </Text>
             <Input.Password
               placeholder="请输入你的API Key"
               defaultValue={apiKey}
-              onPressEnter={(e) =>
-                handleSaveSettings((e.target as HTMLInputElement).value)
-              }
-              style={{ marginTop: 8 }}
+              onPressEnter={(e) => handleSaveSettings((e.target as HTMLInputElement).value)}
+              style={{ marginTop: 8, borderRadius: 'var(--radius-md)' }}
             />
             <Text type="secondary" style={{ fontSize: 12 }}>
               从{' '}
@@ -253,6 +253,7 @@ function App() {
                 href="https://dashscope.console.aliyun.com/apiKey"
                 target="_blank"
                 rel="noreferrer"
+                style={{ color: 'var(--color-primary)' }}
               >
                 阿里云控制台
               </a>{' '}
@@ -261,8 +262,14 @@ function App() {
           </div>
 
           <div>
-            <Text strong>会话ID</Text>
-            <Input value={sessionId} disabled style={{ marginTop: 8 }} />
+            <Text strong style={{ color: 'var(--color-text-primary)' }}>
+              会话ID
+            </Text>
+            <Input
+              value={sessionId}
+              disabled
+              style={{ marginTop: 8, borderRadius: 'var(--radius-md)' }}
+            />
             <Text type="secondary" style={{ fontSize: 12 }}>
               用于WebSocket实时通信
             </Text>
@@ -271,20 +278,24 @@ function App() {
           <Button
             type="primary"
             onClick={() => {
-              const input = document.querySelector(
-                'input[type="password"]'
-              ) as HTMLInputElement;
+              const input = document.querySelector('input[type="password"]') as HTMLInputElement;
               if (input) {
                 handleSaveSettings(input.value);
               }
             }}
             block
+            size="large"
+            style={{
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary)',
+              height: '44px',
+            }}
           >
             保存设置
           </Button>
         </Space>
       </Modal>
-    </Layout>
+    </div>
   );
 }
 

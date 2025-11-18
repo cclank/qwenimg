@@ -5,15 +5,62 @@
   line-height: 1.5;
   font-weight: 400;
 
+  /* 高级黑白灰配色体系 */
+  --color-background: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f5f5f5;
+  --color-surface-active: #ebebeb;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-hover: rgba(0, 0, 0, 0.12);
+
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #999999;
+  --color-text-disabled: #cccccc;
+
+  --color-primary: #1a1a1a;
+  --color-primary-hover: #333333;
+  --color-primary-active: #000000;
+
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #ebebeb;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #404040;
+  --color-gray-800: #262626;
+  --color-gray-900: #1a1a1a;
+
+  /* 圆角规范 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* 阴影规范 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 0 1.07px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 8px 0 rgba(0, 0, 0, 0.08), 0 0 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 8px 16px 0 rgba(0, 0, 0, 0.12), 0 0 4px 0 rgba(0, 0, 0, 0.4);
+
   color-scheme: light;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #f0f2f5;
+  color: var(--color-text-primary);
+  background-color: var(--color-background);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
@@ -25,4 +72,33 @@ body {
 #root {
   width: 100%;
   min-height: 100vh;
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+/* 隐藏滚动条但保持可滚动 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
