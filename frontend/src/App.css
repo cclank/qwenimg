@@ -62,20 +62,19 @@
 
 /* ===== 创作配置对话框 ===== */
 .creation-dialog {
-  position: fixed;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.9);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
+  overflow: visible;
   transition: all 0.2s ease;
   width: 100%;
-  max-width: 800px;
+  max-width: 900px;
+  margin: 0 auto 24px;
 }
 
 .creation-dialog:hover {
@@ -611,4 +610,14 @@
 
 .ant-progress-line {
   border-radius: var(--radius-full);
+}
+
+/* ===== 动画 ===== */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
