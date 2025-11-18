@@ -418,12 +418,15 @@
   margin-top: 20px;
 }
 
+/* Prompt tooltip - hidden by default */
 .prompt-tooltip {
   transform: translateY(100%);
   transition: transform 0.2s ease;
+  pointer-events: none;
 }
 
-.results-masonry div:hover .prompt-tooltip {
+/* Show tooltip on hover */
+.results-masonry > div > div:hover .prompt-tooltip {
   transform: translateY(0);
 }
 

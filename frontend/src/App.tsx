@@ -9,6 +9,7 @@ import {
   HistoryOutlined,
   BulbOutlined,
   ThunderboltOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import { CreationDialog } from './components/CreationDialog';
 import { ActiveTasksPanel } from './components/ActiveTasksPanel';
@@ -331,6 +332,29 @@ function App() {
                           e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
+                        {/* Video Badge - Distinguish from images */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0, 0, 0, 0.7)',
+                            backdropFilter: 'blur(10px)',
+                            borderRadius: 'var(--radius-full)',
+                            padding: '6px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            zIndex: 10,
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            color: 'white',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                          }}
+                        >
+                          <PlayCircleOutlined style={{ fontSize: '14px' }} />
+                          <span>视频</span>
+                        </div>
                         <video
                           src={task.result_urls[0]}
                           style={{
