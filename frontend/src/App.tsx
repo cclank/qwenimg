@@ -158,9 +158,9 @@ function App() {
           <div className="results-masonry">
             {tasks
               .filter((task) => task.status === 'completed')
-              .slice(0, 12)
+              .slice(0, 3)
               .map((task) => (
-                <div key={task.task_id} style={{ breakInside: 'avoid', marginBottom: '16px' }}>
+                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(33.333% - 21px)' }}>
                   {task.task_type === 'text_to_image' && task.result_urls && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {task.result_urls.map((url, index) => (
@@ -172,6 +172,9 @@ function App() {
                             boxShadow: 'var(--shadow-sm)',
                             transition: 'all 0.2s ease',
                             cursor: 'pointer',
+                            position: 'relative',
+                            width: '100%',
+                            height: '100%',
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.boxShadow = 'var(--shadow-md)';
@@ -189,8 +192,29 @@ function App() {
                               width: '100%',
                               height: 'auto',
                               display: 'block',
+                              maxHeight: '450px',
+                              objectFit: 'cover',
                             }}
                           />
+                          {task.prompt && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'rgba(0, 0, 0, 0.7)',
+                                color: 'white',
+                                padding: '8px',
+                                fontSize: '12px',
+                                transform: 'translateY(100%)',
+                                transition: 'transform 0.2s ease',
+                              }}
+                              className="prompt-tooltip"
+                            >
+                              {task.prompt}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -203,6 +227,18 @@ function App() {
                           overflow: 'hidden',
                           boxShadow: 'var(--shadow-sm)',
                           transition: 'all 0.2s ease',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                          e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
                         <video
@@ -212,8 +248,29 @@ function App() {
                             width: '100%',
                             height: 'auto',
                             display: 'block',
+                            maxHeight: '450px',
+                            objectFit: 'cover',
                           }}
                         />
+                        {task.prompt && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              background: 'rgba(0, 0, 0, 0.7)',
+                              color: 'white',
+                              padding: '8px',
+                              fontSize: '12px',
+                              transform: 'translateY(100%)',
+                              transition: 'transform 0.2s ease',
+                            }}
+                            className="prompt-tooltip"
+                          >
+                            {task.prompt}
+                          </div>
+                        )}
                       </div>
                     )}
                 </div>
