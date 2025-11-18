@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import {
   Form, Input, Select, Upload, message, InputNumber,
-  Switch, Dropdown, Modal, type MenuProps
+  Switch, Dropdown, Modal, Tooltip, type MenuProps
 } from 'antd';
 import {
   PictureOutlined, VideoCameraOutlined,
@@ -155,28 +155,29 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
               {/* 图片上传按钮 - 仅图生视频模式显示 */}
               {mediaMode === 'image_to_video' && (
                 <Form.Item name="image_upload" noStyle>
-                  <Upload
-                    accept="image/*"
-                    beforeUpload={handleUpload as any}
-                    maxCount={1}
-                    showUploadList={false}
-                  >
-                    <button
-                      type="button"
-                      className="control-select-btn"
-                      title="上传参考图片用于图生视频"
-                      style={{
-                        height: '74px',
-                        aspectRatio: '1.72',
-                        border: `2px dashed ${imageUrl ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        borderRadius: 'var(--radius-md)',
-                        background: imageUrl ? 'var(--color-gray-50)' : 'transparent'
-                      }}
+                  <Tooltip title="上传参考图片用于图生视频" placement="right">
+                    <Upload
+                      accept="image/*"
+                      beforeUpload={handleUpload as any}
+                      maxCount={1}
+                      showUploadList={false}
                     >
-                      <PictureOutlined />
-                      <span>{imageUrl ? '已上传' : '上传图片'}</span>
-                    </button>
-                  </Upload>
+                      <button
+                        type="button"
+                        className="control-select-btn"
+                        style={{
+                          height: '74px',
+                          aspectRatio: '1.72',
+                          border: `2px dashed ${imageUrl ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          borderRadius: 'var(--radius-md)',
+                          background: imageUrl ? 'var(--color-gray-50)' : 'transparent'
+                        }}
+                      >
+                        <PictureOutlined />
+                        <span>{imageUrl ? '已上传' : '上传图片'}</span>
+                      </button>
+                    </Upload>
+                  </Tooltip>
                 </Form.Item>
               )}
             </div>
@@ -185,49 +186,52 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
           {/* 右上角模式切换器 */}
           <div className="dialog-mode-selector-top-right">
             <div className="mode-toggle-icons">
-              <button
-                type="button"
-                className={`mode-icon-btn ${mediaMode === 'image' ? 'active' : ''}`}
-                onClick={() => {
-                  setMediaMode('image');
-                  setTaskType('text_to_image');
-                  setImageUrl(''); // 清除图片
-                }}
-                title="文生图 - 使用文字描述生成图片"
-              >
-                <PictureOutlined />
-              </button>
-              <button
-                type="button"
-                className={`mode-icon-btn ${mediaMode === 'video' ? 'active' : ''}`}
-                onClick={() => {
-                  setMediaMode('video');
-                  setTaskType('text_to_video');
-                  setImageUrl(''); // 清除图片
-                }}
-                title="文生视频 - 使用文字描述生成视频"
-              >
-                <VideoCameraOutlined />
-              </button>
-              <button
-                type="button"
-                className={`mode-icon-btn ${mediaMode === 'image_to_video' ? 'active' : ''}`}
-                onClick={() => {
-                  setMediaMode('image_to_video');
-                  setTaskType('image_to_video');
-                }}
-                title="图生视频 - 上传图片生成动态视频"
-              >
-                <div className="image-to-video-single-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M8 10C8 8.89543 8.89543 8 10 8H14C15.1046 8 16 8.89543 16 10V14C16 15.1046 15.1046 16 14 16H10C8.89543 16 8 15.1046 8 14V10Z" stroke="currentColor" strokeWidth="1.5"/>
-                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                    <path d="M16 8L19 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    <path d="M16 16L19 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </div>
-              </button>
+              <Tooltip title="文生图 - 使用文字描述生成图片" placement="top">
+                <button
+                  type="button"
+                  className={`mode-icon-btn ${mediaMode === 'image' ? 'active' : ''}`}
+                  onClick={() => {
+                    setMediaMode('image');
+                    setTaskType('text_to_image');
+                    setImageUrl(''); // 清除图片
+                  }}
+                >
+                  <PictureOutlined />
+                </button>
+              </Tooltip>
+              <Tooltip title="文生视频 - 使用文字描述生成视频" placement="top">
+                <button
+                  type="button"
+                  className={`mode-icon-btn ${mediaMode === 'video' ? 'active' : ''}`}
+                  onClick={() => {
+                    setMediaMode('video');
+                    setTaskType('text_to_video');
+                    setImageUrl(''); // 清除图片
+                  }}
+                >
+                  <VideoCameraOutlined />
+                </button>
+              </Tooltip>
+              <Tooltip title="图生视频 - 上传图片生成动态视频" placement="top">
+                <button
+                  type="button"
+                  className={`mode-icon-btn ${mediaMode === 'image_to_video' ? 'active' : ''}`}
+                  onClick={() => {
+                    setMediaMode('image_to_video');
+                    setTaskType('image_to_video');
+                  }}
+                >
+                  <div className="image-to-video-single-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M8 10C8 8.89543 8.89543 8 10 8H14C15.1046 8 16 8.89543 16 10V14C16 15.1046 15.1046 16 14 16H10C8.89543 16 8 15.1046 8 14V10Z" stroke="currentColor" strokeWidth="1.5"/>
+                      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                      <path d="M16 8L19 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M16 16L19 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -257,16 +261,14 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
         <div className="dialog-footer">
           {/* 左侧控制按钮 - 桌面端显示 */}
           <div className="dialog-controls">
-            <Dropdown menu={{ items: modelOptions }} placement="topLeft">
-              <button
-                type="button"
-                className="control-select-btn"
-                title={`模型选择 - 当前: ${mediaMode === 'image' ? 'Wan 2.5 图像模型' : 'Wan 2.5 视频模型'}`}
-              >
-                <PictureOutlined />
-                <span>{mediaMode === 'image' ? 'Wan 2.5 Image' : 'Wan 2.5 Video'}</span>
-              </button>
-            </Dropdown>
+            <Tooltip title={`模型选择 - 当前: ${mediaMode === 'image' ? 'Wan 2.5 图像模型' : 'Wan 2.5 视频模型'}`} placement="top">
+              <Dropdown menu={{ items: modelOptions }} placement="topLeft">
+                <button type="button" className="control-select-btn">
+                  <PictureOutlined />
+                  <span>{mediaMode === 'image' ? 'Wan 2.5 Image' : 'Wan 2.5 Video'}</span>
+                </button>
+              </Dropdown>
+            </Tooltip>
 
             {mediaMode === 'image' && (
               <>
@@ -281,79 +283,71 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                     ]}
                   />
                 </Form.Item>
-                <Dropdown menu={{ items: aspectRatioOptions }} placement="topLeft">
-                  <button
-                    type="button"
-                    className="control-select-btn"
-                    title="图片尺寸比例 - 选择生成图片的宽高比"
-                  >
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
+                <Tooltip title="图片尺寸比例 - 选择生成图片的宽高比" placement="top">
+                  <Dropdown menu={{ items: aspectRatioOptions }} placement="topLeft">
+                    <button type="button" className="control-select-btn">
                       <div style={{
-                        width: '13px',
-                        height: '13px',
-                        border: '1.5px solid currentColor',
-                        borderRadius: '2px'
-                      }} />
-                    </div>
-                    <span>{form.getFieldValue('size') === '1024*1024' ? '1:1' : form.getFieldValue('size') === '1280*720' ? '16:9' : form.getFieldValue('size') === '720*1280' ? '9:16' : '4:3'}</span>
-                  </button>
-                </Dropdown>
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <div style={{
+                          width: '13px',
+                          height: '13px',
+                          border: '1.5px solid currentColor',
+                          borderRadius: '2px'
+                        }} />
+                      </div>
+                      <span>{form.getFieldValue('size') === '1024*1024' ? '1:1' : form.getFieldValue('size') === '1280*720' ? '16:9' : form.getFieldValue('size') === '720*1280' ? '9:16' : '4:3'}</span>
+                    </button>
+                  </Dropdown>
+                </Tooltip>
 
                 <Form.Item name="n" noStyle>
                   <Select style={{ display: 'none' }} />
                 </Form.Item>
-                <Dropdown menu={{ items: numberOptions }} placement="topLeft">
-                  <button
-                    type="button"
-                    className="control-select-btn"
-                    title="生成数量 - 一次生成多少张图片（1-4张）"
-                  >
-                    <NumberOutlined />
-                    <span>{form.getFieldValue('n') || 1}</span>
-                  </button>
-                </Dropdown>
+                <Tooltip title="生成数量 - 一次生成多少张图片（1-4张）" placement="top">
+                  <Dropdown menu={{ items: numberOptions }} placement="topLeft">
+                    <button type="button" className="control-select-btn">
+                      <NumberOutlined />
+                      <span>{form.getFieldValue('n') || 1}</span>
+                    </button>
+                  </Dropdown>
+                </Tooltip>
               </>
             )}
 
             {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
               <>
-                <Dropdown menu={{ items: [
-                  { key: '480P', label: '480P', onClick: () => form.setFieldValue('resolution', '480P') },
-                  { key: '720P', label: '720P', onClick: () => form.setFieldValue('resolution', '720P') },
-                  { key: '1080P', label: '1080P', onClick: () => form.setFieldValue('resolution', '1080P') },
-                ]}} placement="topLeft">
-                  <button
-                    type="button"
-                    className="control-select-btn"
-                    title="视频分辨率 - 选择生成视频的清晰度"
-                  >
-                    <VideoCameraOutlined />
-                    <span>{form.getFieldValue('resolution') || '1080P'}</span>
-                  </button>
-                </Dropdown>
+                <Tooltip title="视频分辨率 - 选择生成视频的清晰度" placement="top">
+                  <Dropdown menu={{ items: [
+                    { key: '480P', label: '480P', onClick: () => form.setFieldValue('resolution', '480P') },
+                    { key: '720P', label: '720P', onClick: () => form.setFieldValue('resolution', '720P') },
+                    { key: '1080P', label: '1080P', onClick: () => form.setFieldValue('resolution', '1080P') },
+                  ]}} placement="topLeft">
+                    <button type="button" className="control-select-btn">
+                      <VideoCameraOutlined />
+                      <span>{form.getFieldValue('resolution') || '1080P'}</span>
+                    </button>
+                  </Dropdown>
+                </Tooltip>
 
-                <Dropdown menu={{ items: [
-                  { key: '5', label: '5秒', onClick: () => form.setFieldValue('duration', 5) },
-                  { key: '10', label: '10秒', onClick: () => form.setFieldValue('duration', 10) },
-                ]}} placement="topLeft">
-                  <button
-                    type="button"
-                    className="control-select-btn"
-                    title="视频时长 - 选择生成视频的长度"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginRight: '2px' }}>
-                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    <span>{form.getFieldValue('duration') || 10}秒</span>
-                  </button>
-                </Dropdown>
+                <Tooltip title="视频时长 - 选择生成视频的长度" placement="top">
+                  <Dropdown menu={{ items: [
+                    { key: '5', label: '5秒', onClick: () => form.setFieldValue('duration', 5) },
+                    { key: '10', label: '10秒', onClick: () => form.setFieldValue('duration', 10) },
+                  ]}} placement="topLeft">
+                    <button type="button" className="control-select-btn">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginRight: '2px' }}>
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                      <span>{form.getFieldValue('duration') || 10}秒</span>
+                    </button>
+                  </Dropdown>
+                </Tooltip>
 
                 <Form.Item name="resolution" hidden>
                   <Select>
@@ -373,34 +367,36 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
             )}
 
             {/* 高级配置按钮 */}
-            <button
-              type="button"
-              className="control-select-btn"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              title="高级配置 - 设置负面提示词、随机种子等"
-            >
-              <SettingOutlined />
-              <span>高级</span>
-            </button>
+            <Tooltip title="高级配置 - 设置负面提示词、随机种子等" placement="top">
+              <button
+                type="button"
+                className="control-select-btn"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+              >
+                <SettingOutlined />
+                <span>高级</span>
+              </button>
+            </Tooltip>
           </div>
 
           {/* 右侧动作按钮 */}
           <div className="dialog-actions">
-            <button
-              type="submit"
-              className="generate-btn"
-              disabled={loading}
-              title={loading ? '生成中...' : '开始生成'}
-              aria-label="Generate"
-            >
-              {loading ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" opacity="0.3"/>
-                </svg>
-              ) : (
-                <ArrowUpOutlined />
-              )}
-            </button>
+            <Tooltip title={loading ? '生成中...' : '开始生成'} placement="top">
+              <button
+                type="submit"
+                className="generate-btn"
+                disabled={loading}
+                aria-label="Generate"
+              >
+                {loading ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" opacity="0.3"/>
+                  </svg>
+                ) : (
+                  <ArrowUpOutlined />
+                )}
+              </button>
+            </Tooltip>
           </div>
         </div>
 
