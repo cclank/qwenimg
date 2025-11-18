@@ -16,6 +16,7 @@ import { History } from './components/History';
 import { Inspiration } from './components/Inspiration';
 import { LoadingCard } from './components/LoadingCard';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useProgressSimulation } from './hooks/useProgressSimulation';
 import { useAppStore } from './store';
 import './App.css';
 
@@ -38,6 +39,9 @@ function App() {
 
   // 初始化WebSocket
   useWebSocket();
+
+  // 初始化进度模拟
+  useProgressSimulation();
 
   // 页面加载时获取历史任务
   useEffect(() => {
