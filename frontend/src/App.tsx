@@ -14,6 +14,7 @@ import { CreationDialog } from './components/CreationDialog';
 import { ActiveTasksPanel } from './components/ActiveTasksPanel';
 import { History } from './components/History';
 import { Inspiration } from './components/Inspiration';
+import { LoadingCard } from './components/LoadingCard';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAppStore } from './store';
 import './App.css';
@@ -184,6 +185,21 @@ function App() {
         {/* 结果展示区域 - 最新的在前面 */}
         {viewMode === 'create' && (
           <div className="results-masonry">
+            {/* 先显示正在生成的任务（LoadingCard） */}
+            {tasks
+              .filter((task) => task.status === 'pending' || task.status === 'running')
+              .sort((a, b) => {
+                const timeA = new Date(a.created_at || 0).getTime();
+                const timeB = new Date(b.created_at || 0).getTime();
+                return timeB - timeA;
+              })
+              .map((task) => (
+                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(33.333% - 21px)' }}>
+                  <LoadingCard task={task} />
+                </div>
+              ))}
+
+            {/* 然后显示已完成的任务 */}
             {tasks
               .filter((task) => task.status === 'completed')
               .sort((a, b) => {

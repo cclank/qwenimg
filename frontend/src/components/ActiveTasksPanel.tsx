@@ -1,13 +1,14 @@
 /**
- * 实时任务面板 - 浮动面板显示当前进行中的任务
+ * 实时任务面板 - 浮动面板显示当前进行中的任务（默认最小化）
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Empty, Space, Badge } from 'antd';
-import { RocketOutlined } from '@ant-design/icons';
+import { RocketOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
 import { useAppStore } from '@/store';
 import { TaskCard } from './TaskCard';
 
 export const ActiveTasksPanel: React.FC = () => {
+  const [collapsed, setCollapsed] = useState(true); // 默认最小化
   const tasks = useAppStore((state) => state.tasks);
   const removeTask = useAppStore((state) => state.removeTask);
 
@@ -23,9 +24,18 @@ export const ActiveTasksPanel: React.FC = () => {
 
   const allDisplayTasks = [...activeTasks, ...recentCompleted];
 
+  // 如果没有任务，不显示面板
+  if (allDisplayTasks.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="tasks-panel">
-      <div className="tasks-panel-header">
+    <div className={`tasks-panel ${collapsed ? 'collapsed' : 'expanded'}`}>
+      <div
+        className="tasks-panel-header"
+        onClick={() => setCollapsed(!collapsed)}
+        style={{ cursor: 'pointer' }}
+      >
         <Space size="small">
           <RocketOutlined style={{ color: 'var(--color-text-primary)' }} />
           <span className="tasks-panel-title">当前任务</span>
@@ -39,27 +49,20 @@ export const ActiveTasksPanel: React.FC = () => {
             />
           )}
         </Space>
+        {collapsed ? <DownOutlined /> : <UpOutlined />}
       </div>
 
-      <div className="tasks-panel-body">
-        {allDisplayTasks.length === 0 ? (
-          <Empty
-            description="暂无进行中的任务"
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            style={{ padding: '20px 0' }}
-          />
-        ) : (
-          <>
-            {allDisplayTasks.map((task) => (
-              <TaskCard
-                key={task.task_id}
-                task={task}
-                onDelete={removeTask}
-              />
-            ))}
-          </>
-        )}
-      </div>
+      {!collapsed && (
+        <div className="tasks-panel-body">
+          {allDisplayTasks.map((task) => (
+            <TaskCard
+              key={task.task_id}
+              task={task}
+              onDelete={removeTask}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
