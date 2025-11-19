@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  qwenimg:
+    build: .
+    container_name: qwenimg
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=sqlite:///./qwenimg.db
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    volumes:
+      - ./outputs:/app/outputs
+      - ./qwenimg.db:/app/backend/qwenimg.db
+    restart: unless-stopped
+    networks:
+      - qwenimg-network
+
+networks:
+  qwenimg-network:
+    driver: bridge
