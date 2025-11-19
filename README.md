@@ -18,7 +18,7 @@
 
 QwenImg 是一个简洁、操作流畅、激发灵感的 AI 创作平台。我们专注于提供最直观的用户界面和最高效的创作体验，让您可以专注于创意本身，而不是复杂的操作流程。
 
-![QwenImg 界面展示](./docs/images/screenshot.png)
+![QwenImg 界面展示](https://raw.githubusercontent.com/cclank/qwenimg/main/docs/images/screenshot.png)
 
 - 💡 **激发灵感** - 丰富的示例和模板帮助您快速启动创作
 - ⚡ **操作流畅** - 响应式设计，提供丝滑般的用户体验
