@@ -22,54 +22,29 @@
 
 - Python 3.8 或更高版本
 - pip（Python 包管理器）
+- Node.js 16 或更高版本
 
-### 完整安装步骤
+### 🚀 一键安装（推荐）
 
-**1. 克隆或下载项目**
+我们提供了一个自动化脚本，可以一次性完成环境检查、依赖安装和配置。
 
-```bash
-git clone <repository-url>
-cd qwenimg
-```
-
-**2. 创建虚拟环境（推荐）**
+**Linux / macOS:**
 
 ```bash
-# 创建虚拟环境
-python3 -m venv venv
+# 赋予执行权限
+chmod +x install.sh
 
-# 激活虚拟环境
-# Linux/macOS:
-source venv/bin/activate
-# Windows:
-venv\Scripts\activate
+# 运行安装脚本
+./install.sh
 ```
 
-**3. 安装依赖**
-
-方式一：安装为可编辑包（推荐开发使用）
-
-```bash
-pip install -e .
-```
-
-方式二：仅安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-方式三：手动安装
-
-```bash
-pip install dashscope pillow requests python-dotenv
-```
-
-**4. 验证安装**
-
-```bash
-python -c "from qwenimg import QwenImg; print('QwenImg installed successfully!')"
-```
+**安装脚本会自动执行以下操作：**
+1. 检查系统环境（Python, Node.js）
+2. 创建并配置 Python 虚拟环境
+3. 安装后端依赖 (Python)
+4. 安装前端依赖 (Node.js)
+5. 自动配置 `.env` 环境变量文件
+6. 恢复示例数据（如果有）
 
 ## 🔑 API Key 配置
 
@@ -97,22 +72,27 @@ client = QwenImg(api_key="sk-xxx")
 
 ## 🚀 快速开始
 
-### 🌐 方式一：Web 界面（推荐，零代码）
+### 🌐 方式一：Web 界面（推荐）
 
-最简单的使用方式，无需编写任何代码！
+我们提供了基于 React 的现代化 Web 界面，体验更加流畅。
 
 ```bash
-# Linux/macOS
-./run_web_ui.sh
-
-# Windows
-run_web_ui.bat
-
-# 或者手动启动
-streamlit run app.py
+# 启动服务（同时启动前端和后端）
+./start_dev.sh
 ```
 
-然后访问 `http://localhost:8501`，在浏览器中使用所有功能！
+启动后访问：
+- 前端: http://localhost:3000
+- 后端: http://localhost:8000
+
+**功能特性：**
+- ✨ 现代化 UI 设计
+- ⚡️ 实时进度反馈
+- 🖼️ 瀑布流作品展示
+- 🎬 拖拽式图生视频
+- 📱 移动端适配
+
+*(注：旧版 Streamlit 界面已移动至 `legacy_streamlit_ui` 目录)*
 
 ### 🐍 方式二：Python 代码
 
@@ -275,14 +255,21 @@ client = QwenImg(region="singapore")
 
 ### 🌐 Web 界面（推荐）
 
-提供了基于 Streamlit 的可视化 Web 界面，无需编写代码即可使用所有功能：
+提供了基于 React 的现代化 Web 界面，无需编写代码即可使用所有功能：
 
 ```bash
-# 安装 Streamlit
-pip install streamlit
+# 启动服务
+./start_dev.sh
+```
 
-# 运行 Web 界面
-streamlit run app.py
+启动后访问：
+- 前端: http://localhost:3000
+- 后端: http://localhost:8000
+
+**停止服务：**
+```bash
+# 停止服务
+./stop_dev.sh
 ```
 
 **Web 界面功能：**

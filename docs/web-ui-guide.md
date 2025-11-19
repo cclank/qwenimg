@@ -1,38 +1,33 @@
 # QwenImg Web UI 使用指南
 
-QwenImg 提供了一个基于 Streamlit 的现代化 Web 界面，让你无需编写代码即可使用所有功能。
+QwenImg 提供了一个基于 React 的现代化 Web 界面，让你无需编写代码即可使用所有功能。
 
 ## 🚀 快速开始
+ 
+ ### 1. 一键安装
+ 
+ ```bash
+ # 运行安装脚本
+ ./install.sh
+ ```
+ 
+ ### 2. 配置 API Key
+ 
+ 编辑项目根目录下的 `.env` 文件：
+ 
+ ```bash
+ DASHSCOPE_API_KEY="sk-your-api-key"
+ ```
+ 
+ ### 3. 启动 Web 界面
 
-### 1. 安装依赖
+ ```bash
+ ./start_dev.sh
+ ```
 
-```bash
-# 进入项目目录
-cd qwenimg
-
-# 安装 Streamlit
-pip install streamlit
-```
-
-### 2. 配置 API Key
-
-方式一：环境变量
-
-```bash
-export DASHSCOPE_API_KEY="sk-your-api-key"
-```
-
-方式二：Web 界面输入
-
-启动 Web 界面后，在侧边栏输入 API Key。
-
-### 3. 启动 Web 界面
-
-```bash
-streamlit run app.py
-```
-
-浏览器会自动打开 `http://localhost:8501`
+ 浏览器访问 `http://localhost:3000`
+ 
+ > **注意**：后端服务运行在 `http://localhost:8000`，请确保两个端口未被占用。
 
 ## 📸 功能介绍
 
@@ -166,17 +161,21 @@ Web 界面采用现代化设计，分为三个标签页：
 
 ### 无法启动 Web 界面
 
-```bash
-# 确保已安装 Streamlit
-pip install streamlit
+1. 检查端口占用：
+   - 前端默认使用 5173 端口
+   - 后端默认使用 8000 端口
 
-# 检查版本
-streamlit --version
-```
+2. 检查依赖安装：
+   - 确保已运行 `./install.sh`
+   - 尝试重新安装依赖：
+     ```bash
+     cd frontend && npm install
+     cd ../backend && pip install -r requirements.txt
+     ```
 
 ### API Key 错误
 
-- 确保 API Key 正确
+- 确保 `.env` 文件中配置了正确的 `DASHSCOPE_API_KEY`
 - 检查地域选择是否与 API Key 匹配
 - 获取新的 API Key: https://help.aliyun.com/zh/model-studio/get-api-key
 
@@ -184,26 +183,19 @@ streamlit --version
 
 - 检查网络连接
 - 确认提示词是否合规
-- 查看错误信息提示
+- 查看终端输出的错误日志
 
 ## 📱 部署到云端
 
-### Streamlit Cloud（免费）
-
-1. 将代码推送到 GitHub
-2. 访问 [Streamlit Cloud](https://streamlit.io/cloud)
-3. 连接 GitHub 仓库
-4. 部署 `app.py`
-5. 在 Secrets 中配置 `DASHSCOPE_API_KEY`
-
-### 自定义服务器
+### 生产环境构建
 
 ```bash
-# 使用指定端口
-streamlit run app.py --server.port 8080
+# 构建前端
+cd frontend
+npm run build
 
-# 允许外部访问
-streamlit run app.py --server.address 0.0.0.0
+# 启动服务（建议使用 pm2 或类似工具管理进程）
+# ...
 ```
 
 ## 🎯 下一步
