@@ -2,7 +2,7 @@
  * 主应用组件 - 简洁高级黑白灰设计
  */
 import React, { useState, useEffect } from 'react';
-import { Space, Button, Modal, Input, message, Typography, Dropdown, Image, type MenuProps } from 'antd';
+import { Space, Button, Modal, Input, message, Typography, Dropdown, Image, Checkbox, type MenuProps } from 'antd';
 import {
   SettingOutlined,
   GithubOutlined,
@@ -65,6 +65,7 @@ function App() {
               error_message: task.error_message,
               created_at: task.created_at,
               completed_at: task.completed_at,
+              image_count: task.image_count,
             });
           });
         }
@@ -107,12 +108,75 @@ function App() {
     message.success('图片已加载到图生视频');
   };
 
+  // 删除任务
+  const handleDeleteTask = (taskId: string, url?: string) => {
+    const skipConfirm = useAppStore.getState().skipDeleteConfirm;
+    const setSkipDeleteConfirm = useAppStore.getState().setSkipDeleteConfirm;
+
+    const executeDelete = async () => {
+      try {
+        let apiUrl = `/api/generation/task/${taskId}`;
+        if (url) {
+          apiUrl += `?url=${encodeURIComponent(url)}`;
+        }
+
+        const response = await fetch(apiUrl, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          if (url) {
+            useAppStore.getState().removeTaskResult(taskId, url);
+          } else {
+            useAppStore.getState().removeTask(taskId);
+          }
+          message.success('删除成功');
+        } else {
+          message.error('删除失败');
+        }
+      } catch (error) {
+        console.error('Failed to delete task:', error);
+        message.error('删除出错');
+      }
+    };
+
+    if (skipConfirm) {
+      executeDelete();
+      return;
+    }
+
+    let dontAskAgain = false;
+
+    Modal.confirm({
+      title: '确认删除',
+      content: (
+        <div>
+          <p>{url ? '确定要删除这张图片吗？' : '确定要删除这个生成任务吗？删除后无法恢复。'}</p>
+          <div style={{ marginTop: '12px' }}>
+            <Checkbox onChange={(e) => { dontAskAgain = e.target.checked; }}>
+              不再提示
+            </Checkbox>
+          </div>
+        </div>
+      ),
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      centered: true,
+      onOk: () => {
+        if (dontAskAgain) {
+          setSkipDeleteConfirm(true);
+        }
+        return executeDelete();
+      },
+    });
+  };
+
   // 导航菜单
   const navMenuItems: MenuProps['items'] = [
     {
       key: 'create',
       label: '创作',
-      onClick: () => setViewMode('create'),
     },
     {
       key: 'history',
@@ -137,7 +201,11 @@ function App() {
     <div className="app-container">
       {/* 页面头部 */}
       <header className="app-header">
-        <div className="app-logo">
+        <div
+          className="app-logo"
+          onClick={() => setViewMode('create')}
+          style={{ cursor: 'pointer' }}
+        >
           <div className="app-logo-icon">Q</div>
           <span className="app-logo-text">QwenImg</span>
         </div>
@@ -223,6 +291,7 @@ function App() {
         {viewMode === 'create' && (
           <div className="results-masonry">
             {/* 先显示正在生成的任务（LoadingCard） */}
+            {/* 先显示正在生成的任务（LoadingCard） - 拆分为多个卡片 */}
             {tasks
               .filter((task) => task.status === 'pending' || task.status === 'running')
               .sort((a, b) => {
@@ -230,13 +299,17 @@ function App() {
                 const timeB = new Date(b.created_at || 0).getTime();
                 return timeB - timeA;
               })
-              .map((task) => (
-                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
-                  <LoadingCard task={task} />
-                </div>
-              ))}
+              .flatMap((task) => {
+                // 如果是文生图且有数量设置，渲染对应数量的卡片
+                const count = task.task_type === 'text_to_image' ? (task.image_count || 1) : 1;
+                return Array.from({ length: count }).map((_, index) => (
+                  <div key={`${task.task_id}-${index}`} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
+                    <LoadingCard task={task} />
+                  </div>
+                ));
+              })}
 
-            {/* 然后显示已完成的任务 */}
+            {/* 然后显示已完成的任务 - 拆分为多个卡片 */}
             {tasks
               .filter((task) => task.status === 'completed')
               .sort((a, b) => {
@@ -245,139 +318,158 @@ function App() {
                 const timeB = new Date(b.created_at || 0).getTime();
                 return timeB - timeA;
               })
-              .map((task) => (
-                <div key={task.task_id} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
-                  {task.task_type === 'text_to_image' && task.result_urls && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <Image.PreviewGroup>
-                        {task.result_urls.map((url, index) => (
-                          <div
-                            key={index}
-                            style={{
-                              borderRadius: 'var(--radius-lg)',
-                              overflow: 'hidden',
-                              boxShadow: 'var(--shadow-sm)',
-                              transition: 'all 0.2s ease',
-                              position: 'relative',
-                              width: '100%',
-                              height: '100%',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                          >
-                            <Image
-                              src={url}
-                              alt={task.prompt || `Generated ${index}`}
-                              style={{
-                                width: '100%',
-                                height: 'auto',
-                                display: 'block',
-                                maxHeight: '450px',
-                                objectFit: 'cover',
-                                cursor: 'pointer',
-                              }}
-                              preview={{
-                                mask: (
-                                  <div style={{ fontSize: '14px' }}>
-                                    点击预览
-                                  </div>
-                                ),
-                                toolbarRender: (_, { transform: { scale }, actions: { onZoomOut, onZoomIn, onRotateLeft, onRotateRight } }) => (
-                                  <Space size={12} className="toolbar-wrapper">
-                                    <Button
-                                      type="primary"
-                                      icon={<DownloadOutlined />}
-                                      onClick={() => handleDownload(url)}
-                                    >
-                                      下载
-                                    </Button>
-                                    <Button
-                                      icon={<PictureOutlined />}
-                                      onClick={() => {
-                                        handleImageToVideo(url);
-                                      }}
-                                    >
-                                      图生视频
-                                    </Button>
-                                  </Space>
-                                ),
-                                imageRender: (originalNode) => (
-                                  <div style={{ position: 'relative' }}>
-                                    {originalNode}
-                                    {task.prompt && (
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          bottom: 0,
-                                          left: 0,
-                                          right: 0,
-                                          background: 'rgba(0, 0, 0, 0.8)',
-                                          color: 'white',
-                                          padding: '16px 24px',
-                                          fontSize: '14px',
-                                          lineHeight: '1.6',
-                                        }}
-                                      >
-                                        <strong>提示词：</strong>{task.prompt}
-                                      </div>
-                                    )}
-                                  </div>
-                                ),
-                              }}
-                            />
-                            {task.prompt && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  background: 'rgba(0, 0, 0, 0.7)',
-                                  color: 'white',
-                                  padding: '8px',
-                                  fontSize: '12px',
-                                  transform: 'translateY(100%)',
-                                  transition: 'transform 0.2s ease',
-                                }}
-                                className="prompt-tooltip"
-                              >
-                                {task.prompt}
+              .flatMap((task) => {
+                // 文生图：每个结果一个卡片
+                if (task.task_type === 'text_to_image' && Array.isArray(task.result_urls) && task.result_urls.length > 0) {
+                  return task.result_urls.map((url, index) => (
+                    <div key={`${task.task_id}-${index}`} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
+                      <div className="result-card">
+                        <Image
+                          src={url}
+                          alt={task.prompt || `Generated ${index}`}
+                          style={{
+                            width: '100%',
+                            height: 'auto',
+                            display: 'block',
+                            maxHeight: '450px',
+                            objectFit: 'cover',
+                            cursor: 'grab',
+                          }}
+                          draggable="true"
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', url);
+                            e.dataTransfer.setData('text/uri-list', url);
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
+                          preview={{
+                            mask: (
+                              <div style={{ fontSize: '14px' }}>
+                                点击预览
                               </div>
-                            )}
+                            ),
+                            toolbarRender: (_, { transform: { scale }, actions: { onZoomOut, onZoomIn, onRotateLeft, onRotateRight } }) => (
+                              <Space size={12} className="toolbar-wrapper">
+                                <Button
+                                  type="primary"
+                                  icon={<DownloadOutlined />}
+                                  onClick={() => handleDownload(url)}
+                                >
+                                  下载
+                                </Button>
+                                <Button
+                                  icon={<PictureOutlined />}
+                                  onClick={() => {
+                                    handleImageToVideo(url);
+                                  }}
+                                >
+                                  图生视频
+                                </Button>
+                              </Space>
+                            ),
+                            imageRender: (originalNode) => (
+                              <div style={{ position: 'relative' }}>
+                                {originalNode}
+                                {task.prompt && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: 0,
+                                      left: 0,
+                                      right: 0,
+                                      background: 'rgba(0, 0, 0, 0.6)',
+                                      backdropFilter: 'blur(10px)',
+                                      color: 'white',
+                                      padding: '16px 24px',
+                                      fontSize: '14px',
+                                      lineHeight: '1.6',
+                                    }}
+                                  >
+                                    <strong>提示词：</strong>{task.prompt}
+                                  </div>
+                                )}
+                              </div>
+                            ),
+                          }}
+                        />
+                        {task.prompt && (
+                          <div className="prompt-tooltip">
+                            {task.prompt}
                           </div>
-                        ))}
-                      </Image.PreviewGroup>
+                        )}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: 'var(--radius-full)',
+                            padding: '4px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            zIndex: 10,
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            color: 'white',
+                            opacity: 0,
+                            transition: 'opacity 0.2s ease',
+                            pointerEvents: 'none',
+                          }}
+                          className="drag-indicator"
+                        >
+                          <div style={{
+                            width: '6px',
+                            height: '10px',
+                            border: '1px dotted white',
+                            borderRadius: '2px',
+                            opacity: 0.8
+                          }} />
+                          <span>拖拽创作</span>
+                        </div>
+                        {/* 删除按钮 */}
+                        <div
+                          className="delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task.task_id);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: 'var(--radius-full)',
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10,
+                            color: 'white',
+                            cursor: 'pointer',
+                            opacity: 0,
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  {(task.task_type === 'text_to_video' || task.task_type === 'image_to_video') &&
-                    task.result_urls && (
+                  ));
+                }
+
+                // 视频任务：每个结果一个卡片（通常只有一个）
+                if ((task.task_type === 'text_to_video' || task.task_type === 'image_to_video') &&
+                  Array.isArray(task.result_urls) && task.result_urls.length > 0) {
+                  return task.result_urls.map((url, index) => (
+                    <div key={`${task.task_id}-${index}`} style={{ breakInside: 'avoid', width: 'calc(20% - 16px)' }}>
                       <div
-                        style={{
-                          borderRadius: 'var(--radius-lg)',
-                          overflow: 'hidden',
-                          boxShadow: 'var(--shadow-sm)',
-                          transition: 'all 0.2s ease',
-                          position: 'relative',
-                          cursor: 'pointer',
-                          width: '100%',
-                          aspectRatio: '1',
-                          background: '#000',
-                        }}
-                        onClick={() => setVideoPreview({ visible: true, url: task.result_urls[0], prompt: task.prompt })}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
+                        className="result-card"
+                        onClick={() => setVideoPreview({ visible: true, url: url, prompt: task.prompt })}
                       >
                         {/* Video Badge - Distinguish from images */}
                         <div
@@ -385,8 +477,8 @@ function App() {
                             position: 'absolute',
                             top: '8px',
                             right: '8px',
-                            background: 'rgba(0, 0, 0, 0.7)',
-                            backdropFilter: 'blur(10px)',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            backdropFilter: 'blur(4px)',
                             borderRadius: 'var(--radius-full)',
                             padding: '6px 12px',
                             display: 'flex',
@@ -402,8 +494,38 @@ function App() {
                           <PlayCircleOutlined style={{ fontSize: '14px' }} />
                           <span>视频</span>
                         </div>
+                        {/* 删除按钮 - 视频 */}
+                        <div
+                          className="delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task.task_id);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '74px', // 避开视频Badge
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: 'var(--radius-full)',
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10,
+                            color: 'white',
+                            cursor: 'pointer',
+                            opacity: 0,
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+                          </svg>
+                        </div>
                         <video
-                          src={task.result_urls[0]}
+                          src={url}
                           style={{
                             width: '100%',
                             height: '100%',
@@ -419,6 +541,7 @@ function App() {
                             left: '50%',
                             transform: 'translate(-50%, -50%)',
                             background: 'rgba(0, 0, 0, 0.6)',
+                            backdropFilter: 'blur(4px)',
                             color: 'white',
                             padding: '12px 24px',
                             borderRadius: 'var(--radius-full)',
@@ -432,28 +555,17 @@ function App() {
                           点击播放
                         </div>
                         {task.prompt && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              background: 'rgba(0, 0, 0, 0.7)',
-                              color: 'white',
-                              padding: '8px',
-                              fontSize: '12px',
-                              transform: 'translateY(100%)',
-                              transition: 'transform 0.2s ease',
-                            }}
-                            className="prompt-tooltip"
-                          >
+                          <div className="prompt-tooltip">
                             {task.prompt}
                           </div>
                         )}
                       </div>
-                    )}
-                </div>
-              ))}
+                    </div>
+                  ));
+                }
+
+                return [];
+              })}
           </div>
         )}
       </main>

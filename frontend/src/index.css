@@ -5,46 +5,46 @@
   line-height: 1.5;
   font-weight: 400;
 
-  /* 高级黑白灰配色体系 */
-  --color-background: #fafafa;
+  /* 高级黑白灰配色体系 - Premium Black/White/Gray */
+  --color-background: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-hover: #f5f5f5;
-  --color-surface-active: #ebebeb;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-border-hover: rgba(0, 0, 0, 0.12);
+  --color-surface-hover: #f9f9f9;
+  --color-surface-active: #f0f0f0;
+  --color-border: #e5e5e5;
+  --color-border-hover: #d4d4d4;
 
-  --color-text-primary: #1a1a1a;
+  --color-text-primary: #000000;
   --color-text-secondary: #666666;
   --color-text-tertiary: #999999;
   --color-text-disabled: #cccccc;
 
-  --color-primary: #1a1a1a;
+  --color-primary: #000000;
   --color-primary-hover: #333333;
   --color-primary-active: #000000;
 
   --color-gray-50: #fafafa;
   --color-gray-100: #f5f5f5;
-  --color-gray-200: #ebebeb;
+  --color-gray-200: #e5e5e5;
   --color-gray-300: #d4d4d4;
   --color-gray-400: #a3a3a3;
   --color-gray-500: #737373;
   --color-gray-600: #525252;
   --color-gray-700: #404040;
   --color-gray-800: #262626;
-  --color-gray-900: #1a1a1a;
+  --color-gray-900: #171717;
 
   /* 圆角规范 */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
   /* 阴影规范 */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 0 1.07px 0 rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 4px 8px 0 rgba(0, 0, 0, 0.08), 0 0 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 8px 16px 0 rgba(0, 0, 0, 0.12), 0 0 4px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
   color-scheme: light;
   color: var(--color-text-primary);
@@ -129,4 +129,70 @@ body {
 .ant-tooltip-placement-left,
 .ant-tooltip-placement-right {
   padding: 0 !important;
+}
+
+/* Result Card Styles */
+.result-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface);
+}
+
+.result-card .ant-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.result-card .ant-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.result-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+.prompt-tooltip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.result-card:hover .prompt-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.result-card:hover .drag-indicator {
+  opacity: 1 !important;
+}
+
+.result-card:hover .delete-btn {
+  opacity: 1 !important;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 77, 79, 0.8) !important;
 }

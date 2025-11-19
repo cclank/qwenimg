@@ -38,13 +38,33 @@ export const useWebSocket = () => {
 
         case 'task_completed':
           // 任务完成
-          if (msg.task_id && msg.data) {
-            console.log('Task completed:', msg.task_id, msg.data);
-            updateTask(msg.task_id, {
-              status: 'completed',
-              progress: 100,
-              result_urls: msg.data.result_urls,
-            });
+          if (msg.task_id) {
+            const taskId = msg.task_id;
+            console.log('Task completed:', taskId, msg.data);
+
+            // 1. 先使用WebSocket数据更新（快速响应）
+            if (msg.data) {
+              updateTask(taskId, {
+                status: 'completed',
+                progress: 100,
+                result_urls: msg.data.result_urls,
+              });
+            }
+
+            // 2. 立即请求一次最新的任务详情，确保数据完整（特别是result_urls）
+            fetch(`/api/generation/task/${taskId}`)
+              .then(res => res.json())
+              .then(taskData => {
+                console.log('Fetched latest task data:', taskData);
+                updateTask(taskId, {
+                  status: 'completed',
+                  progress: 100,
+                  result_urls: taskData.result_urls,
+                  error_message: taskData.error_message,
+                });
+              })
+              .catch(err => console.error('Failed to fetch completed task details:', err));
+
             message.success('任务完成！');
           }
           break;

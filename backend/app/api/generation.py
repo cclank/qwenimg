@@ -177,13 +177,59 @@ async def get_tasks(
 
 
 @router.delete("/task/{task_id}")
-async def delete_task(task_id: str, db: Session = Depends(get_db)):
-    """删除任务"""
+async def delete_task(task_id: str, url: str = None, db: Session = Depends(get_db)):
+    """删除任务或任务中的特定图片"""
     task = db.query(GenerationTask).filter(GenerationTask.task_id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
+    # 如果指定了URL，则只删除该图片
+    if url:
+        if task.result_urls and url in task.result_urls:
+            # 创建新的列表以触发SQLAlchemy更新
+            new_urls = [u for u in task.result_urls if u != url]
+            task.result_urls = new_urls
+            
+            # 如果没有剩余图片，则删除整个任务
+            if not new_urls:
+                db.delete(task)
+                db.commit()
+                return {"message": "任务已删除"}
+            
+            # 否则只更新result_urls
+            # 注意：对于JSON类型，需要显式标记修改或重新赋值
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(task, "result_urls")
+            db.commit()
+            return {"message": "图片已删除"}
+        else:
+            return {"message": "图片不存在或已删除"}
+
+    # 如果没有指定URL，删除整个任务
     db.delete(task)
     db.commit()
 
     return {"message": "任务已删除"}
+
+
+@router.delete("/tasks")
+async def clear_tasks(session_id: str, db: Session = Depends(get_db)):
+    """清空指定会话的所有任务"""
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Session ID is required")
+
+    # 查询该会话的所有任务
+    tasks = db.query(GenerationTask).filter(GenerationTask.session_id == session_id).all()
+    
+    if not tasks:
+        return {"message": "没有可删除的任务", "count": 0}
+    
+    count = len(tasks)
+    
+    # 批量删除
+    for task in tasks:
+        db.delete(task)
+    
+    db.commit()
+    
+    return {"message": f"已清空 {count} 个任务", "count": count}

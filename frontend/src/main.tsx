@@ -16,9 +16,21 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: '#667eea',
-          borderRadius: 8,
+          colorPrimary: '#000000',
+          borderRadius: 6,
+          wireframe: false,
+          colorBgContainer: '#ffffff',
         },
+        components: {
+          Button: {
+            colorPrimary: '#000000',
+            algorithm: true, // Enable algorithm for hover states
+          },
+          Input: {
+            activeBorderColor: '#000000',
+            hoverBorderColor: '#000000',
+          }
+        }
       }}
     >
       <App />

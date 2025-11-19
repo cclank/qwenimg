@@ -13,11 +13,13 @@ import {
   Spin,
   message,
   Pagination,
+  Modal,
 } from 'antd';
 import {
   HistoryOutlined,
   ReloadOutlined,
   ClearOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { TaskCard } from './TaskCard';
 import { generationAPI } from '@/services/api';
@@ -71,8 +73,32 @@ export const History: React.FC = () => {
   };
 
   const handleClearAll = () => {
-    // TODO: 实现批量删除
-    message.info('批量删除功能开发中...');
+    if (tasks.length === 0) {
+      message.info('暂无记录可清空');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认清空历史记录',
+      icon: <ExclamationCircleOutlined />,
+      content: '确定要清空所有生成记录吗？此操作不可恢复。',
+      okText: '确认清空',
+      okType: 'danger',
+      cancelText: '取消',
+      centered: true,
+      onOk: async () => {
+        try {
+          await generationAPI.clearTasks(sessionId);
+          message.success('历史记录已清空');
+          // 更新本地store
+          useAppStore.getState().clearTasks();
+          // 重新获取列表（应该是空的）
+          fetchTasks();
+        } catch (error) {
+          message.error('清空失败');
+        }
+      },
+    });
   };
 
   return (
