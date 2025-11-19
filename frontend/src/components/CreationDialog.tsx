@@ -1,7 +1,7 @@
 /**
  * 创作配置对话框 - 紧凑高级设计
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Form, Input, Select, Upload, message, InputNumber,
   Switch, Dropdown, Modal, Tooltip, type MenuProps
@@ -27,6 +27,8 @@ type MediaMode = 'image' | 'video' | 'image_to_video';
 export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
   const sessionId = useAppStore((state) => state.sessionId);
   const addTask = useAppStore((state) => state.addTask);
+  const imageToVideoUrl = useAppStore((state) => state.imageToVideoUrl);
+  const setImageToVideoUrl = useAppStore((state) => state.setImageToVideoUrl);
 
   const [form] = Form.useForm();
   const [mediaMode, setMediaMode] = useState<MediaMode>('image');
@@ -34,6 +36,19 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // 监听图生视频URL变化
+  useEffect(() => {
+    if (imageToVideoUrl) {
+      setMediaMode('image_to_video');
+      setTaskType('image_to_video');
+      setImageUrl(imageToVideoUrl);
+      form.setFieldValue('image_url', imageToVideoUrl);
+      form.setFieldValue('model', 'wan2.5-i2v-preview');
+      // 清除store中的URL
+      setImageToVideoUrl('');
+    }
+  }, [imageToVideoUrl, form, setImageToVideoUrl]);
 
   // 处理模式切换
   const handleModeChange = (mode: MediaMode) => {

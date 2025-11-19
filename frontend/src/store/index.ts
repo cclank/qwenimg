@@ -47,6 +47,9 @@ interface AppState {
   // API Key配置
   apiKey: string;
 
+  // 图生视频预填充图片URL
+  imageToVideoUrl: string;
+
   // 操作方法
   setSessionId: (sessionId: string) => void;
   addTask: (task: Task) => void;
@@ -55,6 +58,7 @@ interface AppState {
   setActiveTab: (tab: TaskType | 'history' | 'inspiration') => void;
   setApiKey: (apiKey: string) => void;
   clearTasks: () => void;
+  setImageToVideoUrl: (url: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -63,6 +67,7 @@ export const useAppStore = create<AppState>((set) => ({
   tasks: [],
   activeTab: 'text_to_image',
   apiKey: getStoredApiKey(),
+  imageToVideoUrl: '',
 
   // 设置会话ID
   setSessionId: (sessionId) => set({ sessionId }),
@@ -114,4 +119,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   // 清空任务
   clearTasks: () => set({ tasks: [] }),
+
+  // 设置图生视频URL
+  setImageToVideoUrl: (url) => set({ imageToVideoUrl: url }),
 }));

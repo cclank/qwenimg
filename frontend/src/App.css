@@ -63,7 +63,7 @@
 /* ===== 创作配置对话框 ===== */
 .creation-dialog {
   position: fixed;
-  bottom: 100px;
+  bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
@@ -425,8 +425,8 @@
   pointer-events: none;
 }
 
-/* Show tooltip on hover */
-.results-masonry > div > div:hover .prompt-tooltip {
+/* Show tooltip on hover - for both images and videos */
+.results-masonry > div:hover .prompt-tooltip {
   transform: translateY(0);
 }
 
