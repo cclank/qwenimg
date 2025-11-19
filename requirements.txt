@@ -30,7 +30,7 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
 # ============ 可选依赖 ============
-# Streamlit Web UI（旧版UI，可选）
+# Streamlit Web UI（旧版UI，已归档）
 # streamlit>=1.28.0
 
 # Jupyter Notebook（教程，可选）

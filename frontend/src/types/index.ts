@@ -16,6 +16,7 @@ export interface Task {
   error_message?: string;
   created_at?: string;
   completed_at?: string;
+  image_count?: number;
 }
 
 export interface TextToImageRequest {

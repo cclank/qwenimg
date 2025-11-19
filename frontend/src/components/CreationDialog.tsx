@@ -9,7 +9,7 @@ import {
 import {
   PictureOutlined, VideoCameraOutlined,
   UploadOutlined, SettingOutlined,
-  ArrowUpOutlined, NumberOutlined
+  ArrowUpOutlined, NumberOutlined, ClearOutlined
 } from '@ant-design/icons';
 import api, { generationAPI } from '@/services/api';
 import { useAppStore } from '@/store';
@@ -37,6 +37,12 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // 监听表单值变化以更新UI
+  const size = Form.useWatch('size', form);
+  const n = Form.useWatch('n', form);
+  const resolution = Form.useWatch('resolution', form);
+  const duration = Form.useWatch('duration', form);
+
   // 监听图生视频URL变化
   useEffect(() => {
     if (imageToVideoUrl) {
@@ -55,10 +61,13 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
     setMediaMode(mode);
     if (mode === 'image') {
       setTaskType('text_to_image');
+      form.setFieldValue('model', 'wan2.5-t2i-preview');
     } else if (mode === 'video') {
       setTaskType('text_to_video');
+      form.setFieldValue('model', 'wan2.5-t2v-preview');
     } else if (mode === 'image_to_video') {
       setTaskType('image_to_video');
+      form.setFieldValue('model', 'wan2.5-i2v-preview');
     }
   };
 
@@ -74,6 +83,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
 
       if (mediaMode === 'video' || mediaMode === 'image_to_video') {
         setTaskType('image_to_video');
+        form.setFieldValue('model', 'wan2.5-i2v-preview');
       }
 
       message.success('图片上传成功');
@@ -117,6 +127,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
         progress: 0,
         prompt: values.prompt,
         created_at: new Date().toISOString(),
+        image_count: values.n,
       });
 
       message.success('任务已提交');
@@ -139,23 +150,73 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
 
   // 配置菜单选项
   const modelOptions: MenuProps['items'] = [
-    { key: 'wan2.5-t2i-preview', label: 'Wan 2.5 Image' },
-    { key: 'wan2.5-t2v-preview', label: 'Wan 2.5 Video' },
+    {
+      key: 'wan2.5-t2i-preview',
+      label: 'Wan 2.5 Image',
+      onClick: () => handleModeChange('image')
+    },
+    {
+      key: 'wan2.5-t2v-preview',
+      label: 'Wan 2.5 Video',
+      onClick: () => handleModeChange('video')
+    },
   ];
 
   const aspectRatioOptions: MenuProps['items'] = [
-    { key: '1024*1024', label: '1:1' },
-    { key: '1280*720', label: '16:9' },
-    { key: '720*1280', label: '9:16' },
-    { key: '1024*768', label: '4:3' },
+    { key: '1024*1024', label: '1:1', onClick: () => form.setFieldValue('size', '1024*1024') },
+    { key: '1280*720', label: '16:9', onClick: () => form.setFieldValue('size', '1280*720') },
+    { key: '720*1280', label: '9:16', onClick: () => form.setFieldValue('size', '720*1280') },
+    { key: '1024*768', label: '4:3', onClick: () => form.setFieldValue('size', '1024*768') },
   ];
 
   const numberOptions: MenuProps['items'] = [
-    { key: '1', label: '1' },
-    { key: '2', label: '2' },
-    { key: '3', label: '3' },
-    { key: '4', label: '4' },
+    { key: '1', label: '1', onClick: () => form.setFieldValue('n', 1) },
+    { key: '2', label: '2', onClick: () => form.setFieldValue('n', 2) },
+    { key: '3', label: '3', onClick: () => form.setFieldValue('n', 3) },
+    { key: '4', label: '4', onClick: () => form.setFieldValue('n', 4) },
   ];
+
+  // 获取比例图标
+  const getAspectRatioIcon = (ratioSize: string) => {
+    let width = 14;
+    let height = 14;
+
+    switch (ratioSize) {
+      case '1024*1024': // 1:1
+        width = 14;
+        height = 14;
+        break;
+      case '1280*720': // 16:9
+        width = 18;
+        height = 10;
+        break;
+      case '720*1280': // 9:16
+        width = 10;
+        height = 18;
+        break;
+      case '1024*768': // 4:3
+        width = 16;
+        height = 12;
+        break;
+    }
+
+    return (
+      <div style={{
+        width: '20px',
+        height: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: `${width}px`,
+          height: `${height}px`,
+          border: '1.5px solid currentColor',
+          borderRadius: '2px'
+        }} />
+      </div>
+    );
+  };
 
   return (
     <div className="creation-dialog">
@@ -180,45 +241,118 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
               {mediaMode === 'image_to_video' && (
                 <Form.Item name="image_upload" noStyle>
                   <Tooltip title="上传图片" placement="right">
-                    <Upload
-                      accept="image/*"
-                      beforeUpload={handleUpload as any}
-                      maxCount={1}
-                      showUploadList={false}
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // 1. Handle files (external drag)
+                        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                          const file = e.dataTransfer.files[0];
+                          if (file.type.startsWith('image/')) {
+                            handleUpload(file);
+                          }
+                          return;
+                        }
+
+                        // 2. Handle internal images (drag from page)
+                        const imageUrl = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+                        if (imageUrl) {
+                          try {
+                            // If it's a blob URL or external URL, try to fetch it
+                            const response = await fetch(imageUrl);
+                            const blob = await response.blob();
+                            const file = new File([blob], "dropped_image.png", { type: blob.type });
+                            handleUpload(file);
+                          } catch (error) {
+                            console.error('Failed to process dropped image:', error);
+                            // If fetch fails (e.g. CORS), try to use the URL directly if it's a valid image URL
+                            // But our backend expects a file upload, so we might be stuck if we can't fetch it.
+                            // For generated images (same domain), fetch should work.
+                          }
+                        }
+                      }}
                     >
-                      <button
-                        type="button"
-                        className="control-select-btn"
+                      <Upload.Dragger
+                        accept="image/*"
+                        beforeUpload={handleUpload as any}
+                        maxCount={1}
+                        showUploadList={false}
+                        openFileDialogOnClick={true}
                         style={{
-                          height: '74px',
-                          aspectRatio: '1.72',
-                          border: `2px dashed ${imageUrl ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                          borderRadius: 'var(--radius-md)',
-                          background: imageUrl ? 'var(--color-gray-50)' : 'transparent',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          padding: imageUrl ? '0' : '8px',
+                          padding: 0,
+                          border: 'none',
+                          background: 'transparent',
                         }}
                       >
-                        {imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt="Uploaded"
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              borderRadius: 'var(--radius-md)',
-                            }}
-                          />
-                        ) : (
-                          <>
-                            <PictureOutlined />
-                            <span>上传图片</span>
-                          </>
-                        )}
-                      </button>
-                    </Upload>
+                        <button
+                          type="button"
+                          className="control-select-btn"
+                          style={{
+                            height: '74px',
+                            width: '100%',
+                            aspectRatio: '1.72',
+                            border: `2px dashed ${imageUrl ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            borderRadius: 'var(--radius-md)',
+                            background: imageUrl ? 'var(--color-gray-50)' : 'transparent',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            padding: imageUrl ? '0' : '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {imageUrl ? (
+                            <>
+                              <img
+                                src={imageUrl}
+                                alt="Uploaded"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  borderRadius: 'var(--radius-md)',
+                                }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  background: 'rgba(0,0,0,0.5)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'white',
+                                  opacity: 0,
+                                  transition: 'opacity 0.3s',
+                                  borderRadius: 'var(--radius-md)',
+                                  fontSize: '12px',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                                onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                              >
+                                点击或拖拽替换
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <PictureOutlined style={{ fontSize: '20px', marginBottom: '4px' }} />
+                              <span style={{ fontSize: '12px' }}>上传图片</span>
+                            </>
+                          )}
+                        </button>
+                      </Upload.Dragger>
+                    </div>
                   </Tooltip>
                 </Form.Item>
               )}
@@ -232,12 +366,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 <button
                   type="button"
                   className={`mode-icon-btn ${mediaMode === 'image' ? 'active' : ''}`}
-                  onClick={() => {
-                    setMediaMode('image');
-                    setTaskType('text_to_image');
-                    setImageUrl(''); // 清除图片
-                    form.setFieldValue('model', 'wan2.5-t2i-preview'); // 设置图片模型
-                  }}
+                  onClick={() => handleModeChange('image')}
                 >
                   <PictureOutlined />
                 </button>
@@ -246,12 +375,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 <button
                   type="button"
                   className={`mode-icon-btn ${mediaMode === 'video' ? 'active' : ''}`}
-                  onClick={() => {
-                    setMediaMode('video');
-                    setTaskType('text_to_video');
-                    setImageUrl(''); // 清除图片
-                    form.setFieldValue('model', 'wan2.5-t2v-preview'); // 设置视频模型
-                  }}
+                  onClick={() => handleModeChange('video')}
                 >
                   <VideoCameraOutlined />
                 </button>
@@ -263,16 +387,16 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   onClick={() => {
                     setMediaMode('image_to_video');
                     setTaskType('image_to_video');
-                    form.setFieldValue('model', 'wan2.5-t2v-preview'); // 设置视频模型
+                    form.setFieldValue('model', 'wan2.5-i2v-preview');
                   }}
                 >
                   <div className="image-to-video-single-icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                      <path d="M8 10C8 8.89543 8.89543 8 10 8H14C15.1046 8 16 8.89543 16 10V14C16 15.1046 15.1046 16 14 16H10C8.89543 16 8 15.1046 8 14V10Z" stroke="currentColor" strokeWidth="1.5"/>
-                      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                      <path d="M16 8L19 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      <path d="M16 16L19 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M8 10C8 8.89543 8.89543 8 10 8H14C15.1046 8 16 8.89543 16 10V14C16 15.1046 15.1046 16 14 16H10C8.89543 16 8 15.1046 8 14V10Z" stroke="currentColor" strokeWidth="1.5" />
+                      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                      <path d="M16 8L19 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      <path d="M16 16L19 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
                   </div>
                 </button>
@@ -291,15 +415,29 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   mediaMode === 'image'
                     ? 'Describe your image...'
                     : mediaMode === 'video'
-                    ? 'Describe your video scene...'
-                    : imageUrl
-                    ? 'Describe how you want to transform this image into a video...'
-                    : 'First upload an image, then describe how you want to transform it into a video...'
+                      ? 'Describe your video scene...'
+                      : imageUrl
+                        ? 'Describe how you want to transform this image into a video...'
+                        : 'First upload an image, then describe how you want to transform it into a video...'
                 }
                 maxLength={2000}
                 onKeyDown={handleKeyDown}
               />
             </Form.Item>
+            {/* 清空按钮 - 左下角 */}
+            <Tooltip title="清空输入" placement="top">
+              <button
+                type="button"
+                className="clear-input-btn"
+                onClick={() => {
+                  form.setFieldValue('prompt', '');
+                  message.success('已清空输入');
+                }}
+                aria-label="Clear input"
+              >
+                <ClearOutlined />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -310,7 +448,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
             <Tooltip title="模型" placement="bottom">
               <Dropdown menu={{ items: modelOptions }} placement="topLeft">
                 <button type="button" className="control-select-btn">
-                  <PictureOutlined />
+                  {mediaMode === 'image' ? <PictureOutlined /> : <VideoCameraOutlined />}
                   <span>{mediaMode === 'image' ? 'Wan 2.5 Image' : 'Wan 2.5 Video'}</span>
                 </button>
               </Dropdown>
@@ -332,21 +470,8 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                 <Tooltip title="尺寸比例" placement="bottom">
                   <Dropdown menu={{ items: aspectRatioOptions }} placement="topLeft">
                     <button type="button" className="control-select-btn">
-                      <div style={{
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <div style={{
-                          width: '13px',
-                          height: '13px',
-                          border: '1.5px solid currentColor',
-                          borderRadius: '2px'
-                        }} />
-                      </div>
-                      <span>{form.getFieldValue('size') === '1024*1024' ? '1:1' : form.getFieldValue('size') === '1280*720' ? '16:9' : form.getFieldValue('size') === '720*1280' ? '9:16' : '4:3'}</span>
+                      {getAspectRatioIcon(size || '1024*1024')}
+                      <span>{size === '1024*1024' ? '1:1' : size === '1280*720' ? '16:9' : size === '720*1280' ? '9:16' : '4:3'}</span>
                     </button>
                   </Dropdown>
                 </Tooltip>
@@ -358,7 +483,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
                   <Dropdown menu={{ items: numberOptions }} placement="topLeft">
                     <button type="button" className="control-select-btn">
                       <NumberOutlined />
-                      <span>{form.getFieldValue('n') || 1}</span>
+                      <span>{n || 1}</span>
                     </button>
                   </Dropdown>
                 </Tooltip>
@@ -368,29 +493,33 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
             {(mediaMode === 'video' || mediaMode === 'image_to_video') && (
               <>
                 <Tooltip title="分辨率" placement="bottom">
-                  <Dropdown menu={{ items: [
-                    { key: '480P', label: '480P', onClick: () => form.setFieldValue('resolution', '480P') },
-                    { key: '720P', label: '720P', onClick: () => form.setFieldValue('resolution', '720P') },
-                    { key: '1080P', label: '1080P', onClick: () => form.setFieldValue('resolution', '1080P') },
-                  ]}} placement="topLeft">
+                  <Dropdown menu={{
+                    items: [
+                      { key: '480P', label: '480P', onClick: () => form.setFieldValue('resolution', '480P') },
+                      { key: '720P', label: '720P', onClick: () => form.setFieldValue('resolution', '720P') },
+                      { key: '1080P', label: '1080P', onClick: () => form.setFieldValue('resolution', '1080P') },
+                    ]
+                  }} placement="topLeft">
                     <button type="button" className="control-select-btn">
                       <VideoCameraOutlined />
-                      <span>{form.getFieldValue('resolution') || '1080P'}</span>
+                      <span>{resolution || '1080P'}</span>
                     </button>
                   </Dropdown>
                 </Tooltip>
 
                 <Tooltip title="时长" placement="bottom">
-                  <Dropdown menu={{ items: [
-                    { key: '5', label: '5秒', onClick: () => form.setFieldValue('duration', 5) },
-                    { key: '10', label: '10秒', onClick: () => form.setFieldValue('duration', 10) },
-                  ]}} placement="topLeft">
+                  <Dropdown menu={{
+                    items: [
+                      { key: '5', label: '5秒', onClick: () => form.setFieldValue('duration', 5) },
+                      { key: '10', label: '10秒', onClick: () => form.setFieldValue('duration', 10) },
+                    ]
+                  }} placement="topLeft">
                     <button type="button" className="control-select-btn">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginRight: '2px' }}>
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                        <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
-                      <span>{form.getFieldValue('duration') || 10}秒</span>
+                      <span>{duration || 10}秒</span>
                     </button>
                   </Dropdown>
                 </Tooltip>
@@ -436,7 +565,7 @@ export const CreationDialog: React.FC<CreationDialogProps> = ({ onSubmit }) => {
               >
                 {loading ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" opacity="0.3"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" opacity="0.3" />
                   </svg>
                 ) : (
                   <ArrowUpOutlined />

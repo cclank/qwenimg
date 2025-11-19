@@ -6,7 +6,7 @@ import type { Task, TaskType } from '@/types';
 
 // 生成简单的UUID
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -55,10 +55,15 @@ interface AppState {
   addTask: (task: Task) => void;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   removeTask: (taskId: string) => void;
+  removeTaskResult: (taskId: string, url: string) => void;
   setActiveTab: (tab: TaskType | 'history' | 'inspiration') => void;
   setApiKey: (apiKey: string) => void;
   clearTasks: () => void;
   setImageToVideoUrl: (url: string) => void;
+
+  // 删除确认设置
+  skipDeleteConfirm: boolean;
+  setSkipDeleteConfirm: (skip: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -68,6 +73,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeTab: 'text_to_image',
   apiKey: getStoredApiKey(),
   imageToVideoUrl: '',
+  skipDeleteConfirm: typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('skip_delete_confirm') === 'true' : false,
 
   // 设置会话ID
   setSessionId: (sessionId) => set({ sessionId }),
@@ -106,6 +112,29 @@ export const useAppStore = create<AppState>((set) => ({
       tasks: state.tasks.filter((task) => task.task_id !== taskId),
     })),
 
+  // 删除任务中的特定结果
+  removeTaskResult: (taskId, url) =>
+    set((state) => {
+      const task = state.tasks.find((t) => t.task_id === taskId);
+      if (!task || !task.result_urls) return {};
+
+      const newResultUrls = task.result_urls.filter((u) => u !== url);
+
+      // 如果没有剩余结果，删除整个任务
+      if (newResultUrls.length === 0) {
+        return {
+          tasks: state.tasks.filter((t) => t.task_id !== taskId),
+        };
+      }
+
+      // 否则更新任务的result_urls
+      return {
+        tasks: state.tasks.map((t) =>
+          t.task_id === taskId ? { ...t, result_urls: newResultUrls } : t
+        ),
+      };
+    }),
+
   // 切换Tab
   setActiveTab: (tab) => set({ activeTab: tab }),
 
@@ -121,5 +150,14 @@ export const useAppStore = create<AppState>((set) => ({
   clearTasks: () => set({ tasks: [] }),
 
   // 设置图生视频URL
+  // 设置图生视频URL
   setImageToVideoUrl: (url) => set({ imageToVideoUrl: url }),
+
+  // 设置是否跳过删除确认
+  setSkipDeleteConfirm: (skip) => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('skip_delete_confirm', String(skip));
+    }
+    set({ skipDeleteConfirm: skip });
+  },
 }));

@@ -112,17 +112,66 @@ export const ImageToVideo: React.FC = () => {
               name="image_upload"
               rules={[{ required: !imageUrl, message: '请上传图片' }]}
             >
-              <Upload
+              <Upload.Dragger
                 accept="image/*"
                 beforeUpload={handleUpload}
                 maxCount={1}
-                listType="picture-card"
+                showUploadList={false}
+                style={{
+                  background: '#fafafa',
+                  border: '2px dashed #d9d9d9',
+                  borderRadius: '8px',
+                  padding: '20px',
+                }}
               >
-                <div>
-                  <UploadOutlined />
-                  <div style={{ marginTop: 8 }}>上传图片</div>
-                </div>
-              </Upload>
+                {imageUrl ? (
+                  <div style={{ position: 'relative', width: '100%', height: '200px' }}>
+                    <img
+                      src={imageUrl}
+                      alt="Uploaded"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        opacity: 0,
+                        transition: 'opacity 0.3s',
+                        borderRadius: '4px',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                    >
+                      点击或拖拽替换图片
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '20px 0' }}>
+                    <p className="ant-upload-drag-icon">
+                      <UploadOutlined style={{ fontSize: '32px', color: '#000000' }} />
+                    </p>
+                    <p className="ant-upload-text" style={{ fontSize: '16px', color: '#333' }}>
+                      点击或拖拽图片到此处
+                    </p>
+                    <p className="ant-upload-hint" style={{ color: '#999' }}>
+                      支持 JPG, PNG 等常见格式
+                    </p>
+                  </div>
+                )}
+              </Upload.Dragger>
             </Form.Item>
             <Form.Item name="image_url" hidden>
               <Input />

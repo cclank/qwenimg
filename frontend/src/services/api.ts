@@ -91,6 +91,11 @@ export const generationAPI = {
   deleteTask: (taskId: string): Promise<{ message: string }> => {
     return api.delete(`/generation/task/${taskId}`);
   },
+
+  // 清空任务
+  clearTasks: (sessionId: string): Promise<{ message: string; count: number }> => {
+    return api.delete(`/generation/tasks`, { params: { session_id: sessionId } });
+  },
 };
 
 /**

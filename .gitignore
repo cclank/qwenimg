@@ -71,3 +71,4 @@ build/
 
 # Streamlit cache
 .streamlit_cache/
+logs/
