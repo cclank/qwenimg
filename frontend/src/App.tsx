@@ -10,6 +10,8 @@ import {
   BulbOutlined,
   ThunderboltOutlined,
   PlayCircleOutlined,
+  DownloadOutlined,
+  PictureOutlined,
 } from '@ant-design/icons';
 import { CreationDialog } from './components/CreationDialog';
 import { ActiveTasksPanel } from './components/ActiveTasksPanel';
@@ -37,6 +39,7 @@ function App() {
   const sessionId = useAppStore((state) => state.sessionId);
   const addTask = useAppStore((state) => state.addTask);
   const tasks = useAppStore((state) => state.tasks);
+  const setImageToVideoUrl = useAppStore((state) => state.setImageToVideoUrl);
 
   // 初始化WebSocket
   useWebSocket();
@@ -77,6 +80,31 @@ function App() {
     setApiKey(key);
     setSettingsVisible(false);
     message.success('设置已保存');
+  };
+
+  // 下载图片或视频
+  const handleDownload = async (url: string, filename?: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename || url.split('/').pop() || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      message.success('下载成功');
+    } catch (error) {
+      message.error('下载失败');
+    }
+  };
+
+  // 图片再创作 - 加载到图生视频
+  const handleImageToVideo = (imageUrl: string) => {
+    setImageToVideoUrl(imageUrl);
+    message.success('图片已加载到图生视频');
   };
 
   // 导航菜单
@@ -259,6 +287,25 @@ function App() {
                                   <div style={{ fontSize: '14px' }}>
                                     点击预览
                                   </div>
+                                ),
+                                toolbarRender: (_, { transform: { scale }, actions: { onZoomOut, onZoomIn, onRotateLeft, onRotateRight } }) => (
+                                  <Space size={12} className="toolbar-wrapper">
+                                    <Button
+                                      type="primary"
+                                      icon={<DownloadOutlined />}
+                                      onClick={() => handleDownload(url)}
+                                    >
+                                      下载
+                                    </Button>
+                                    <Button
+                                      icon={<PictureOutlined />}
+                                      onClick={() => {
+                                        handleImageToVideo(url);
+                                      }}
+                                    >
+                                      图生视频
+                                    </Button>
+                                  </Space>
                                 ),
                                 imageRender: (originalNode) => (
                                   <div style={{ position: 'relative' }}>
@@ -490,7 +537,17 @@ function App() {
         title="视频预览"
         open={videoPreview.visible}
         onCancel={() => setVideoPreview({ visible: false, url: '' })}
-        footer={null}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownload(videoPreview.url)}
+            >
+              下载视频
+            </Button>
+          </div>
+        }
         centered
         width="80%"
         styles={{
